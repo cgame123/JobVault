@@ -1,6 +1,3 @@
-import { groq } from "@ai-sdk/groq"
-import { generateObject } from "ai"
-
 // Define the schema for receipt data extraction
 const receiptSchema = {
   type: "object",
@@ -27,16 +24,36 @@ export async function processReceiptImage(imageUrl: string): Promise<{
   date: string
 }> {
   try {
+    console.log("Starting receipt processing for image:", imageUrl)
+
     // Fetch the image
+    console.log("Fetching image...")
     const imageResponse = await fetch(imageUrl)
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`)
+    }
+
     const imageBuffer = await imageResponse.arrayBuffer()
     const base64Image = Buffer.from(imageBuffer).toString("base64")
+    console.log("Image fetched and converted to base64")
 
+    // For now, let's use a mock result instead of AI processing
+    // This will help us test if the rest of the flow works
+    console.log("Using mock data for testing")
+    return {
+      vendor: "Test Vendor",
+      amount: 99.99,
+      date: "2025-05-18",
+    }
+
+    // Uncomment this section once the basic flow is working
+    /*
     // Use OCR to extract text from the image
-    // This is a simplified example - in a real app, you might use a dedicated OCR service
     const ocrText = await extractTextFromImage(base64Image)
+    console.log("OCR text extracted:", ocrText)
 
     // Use Groq to extract structured data from the OCR text
+    console.log("Calling Groq model...")
     const { object } = await generateObject({
       model: groq("llama-3.1-8b-instant"),
       prompt: `Extract the following information from this receipt: 
@@ -48,10 +65,12 @@ export async function processReceiptImage(imageUrl: string): Promise<{
       ${ocrText}`,
       schema: receiptSchema,
     })
-
+    
+    console.log("Groq processing complete, received:", object)
     return object
+    */
   } catch (error) {
-    console.error("Error processing receipt:", error)
+    console.error("Error in processReceiptImage:", error)
     throw new Error("Failed to process receipt image")
   }
 }
