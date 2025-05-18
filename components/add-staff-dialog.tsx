@@ -55,6 +55,8 @@ export function AddStaffDialog({ open, onOpenChange }: AddStaffDialogProps) {
         return
       }
 
+      console.log("Submitting staff data:", formData)
+
       // Submit the form data to the API
       const response = await fetch("/api/staff", {
         method: "POST",
@@ -65,6 +67,7 @@ export function AddStaffDialog({ open, onOpenChange }: AddStaffDialogProps) {
       })
 
       const data = await response.json()
+      console.log("API response:", data)
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to create staff member")
@@ -85,8 +88,8 @@ export function AddStaffDialog({ open, onOpenChange }: AddStaffDialogProps) {
       })
       onOpenChange(false)
 
-      // Refresh the page to show the new staff member
-      router.refresh()
+      // Force a hard refresh of the page
+      window.location.href = "/staff"
     } catch (error) {
       console.error("Error creating staff member:", error)
       toast({

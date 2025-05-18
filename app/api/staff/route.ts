@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from "uuid"
 
 export async function GET() {
   try {
+    console.log("Fetching all staff members")
     const { data, error } = await supabase.from("staff").select("*").order("name")
 
     if (error) {
@@ -12,11 +13,13 @@ export async function GET() {
         {
           success: false,
           error: "Failed to fetch staff members",
+          details: error.message,
         },
         { status: 500 },
       )
     }
 
+    console.log(`Found ${data.length} staff members`)
     return NextResponse.json({
       success: true,
       data,
@@ -27,6 +30,7 @@ export async function GET() {
       {
         success: false,
         error: "Failed to fetch staff members",
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 },
     )
@@ -36,9 +40,11 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+    console.log("Creating new staff member:", body)
 
     // Validate required fields
     if (!body.name || !body.phoneNumber || !body.role) {
+      console.error("Missing required fields:", { body })
       return NextResponse.json(
         {
           success: false,
@@ -58,6 +64,8 @@ export async function POST(req: NextRequest) {
       created_at: new Date().toISOString(),
     }
 
+    console.log("Inserting staff member into database:", staffMember)
+
     // Store in database
     const { data, error } = await supabase.from("staff").insert(staffMember).select().single()
 
@@ -73,6 +81,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    console.log("Staff member created successfully:", data)
     return NextResponse.json({
       success: true,
       data,
@@ -83,6 +92,7 @@ export async function POST(req: NextRequest) {
       {
         success: false,
         error: "Failed to create staff member",
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 },
     )
