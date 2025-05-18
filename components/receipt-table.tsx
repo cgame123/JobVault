@@ -43,13 +43,14 @@ export function ReceiptTable({ receipts }: ReceiptTableProps) {
               <TableHead className="text-zinc-400">Amount</TableHead>
               <TableHead className="text-zinc-400">Date</TableHead>
               <TableHead className="text-zinc-400">Staff Member</TableHead>
+              <TableHead className="text-zinc-400">Property</TableHead>
               <TableHead className="text-right text-zinc-400">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {receipts.length === 0 ? (
               <TableRow className="border-zinc-800 hover:bg-zinc-800/50">
-                <TableCell colSpan={6} className="h-24 text-center text-zinc-400">
+                <TableCell colSpan={7} className="h-24 text-center text-zinc-400">
                   No receipts found.
                 </TableCell>
               </TableRow>
@@ -78,6 +79,7 @@ export function ReceiptTable({ receipts }: ReceiptTableProps) {
                   <TableCell className="text-zinc-100">{formatCurrency(receipt.amount)}</TableCell>
                   <TableCell className="text-zinc-100">{formatDate(receipt.date)}</TableCell>
                   <TableCell className="text-zinc-100">{receipt.staffName || "Unknown"}</TableCell>
+                  <TableCell className="text-zinc-100">{receipt.property || "—"}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
@@ -171,6 +173,10 @@ export function ReceiptTable({ receipts }: ReceiptTableProps) {
                 <div>
                   <p className="text-sm font-medium text-zinc-500">Staff Member</p>
                   <p className="text-lg font-semibold text-zinc-100">{selectedReceipt.staffName || "Unknown"}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-sm font-medium text-zinc-500">Property</p>
+                  <p className="text-lg font-semibold text-zinc-100">{selectedReceipt.property || "Not specified"}</p>
                 </div>
               </div>
             </div>

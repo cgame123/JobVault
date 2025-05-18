@@ -6,6 +6,7 @@ export interface Receipt {
   phoneNumber: string
   staffId?: string
   staffName?: string
+  property?: string
   imageUrl: string
   createdAt: string
 }
