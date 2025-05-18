@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import Image from "next/image"
 import type { Receipt } from "@/lib/types"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Eye } from "lucide-react"
+import { Eye, Download, ExternalLink } from "lucide-react"
 
 interface ReceiptTableProps {
   receipts: Receipt[]
@@ -14,13 +15,22 @@ interface ReceiptTableProps {
 
 export function ReceiptTable({ receipts }: ReceiptTableProps) {
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
+  const [imageLoading, setImageLoading] = useState(false)
   const [imageError, setImageError] = useState(false)
 
   // Function to create a proxy URL for Twilio images
-  const getProxyImageUrl = (originalUrl: string) => {
+  const getProxyImageUrl = (originalUrl: string, download = false) => {
     // Create a URL that goes through our API proxy
-    return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}`
+    return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}${download ? "&download=true" : ""}`
   }
+
+  // Reset loading and error states when a new receipt is selected
+  useEffect(() => {
+    if (selectedReceipt) {
+      setImageLoading(true)
+      setImageError(false)
+    }
+  }, [selectedReceipt])
 
   return (
     <>
@@ -51,9 +61,16 @@ export function ReceiptTable({ receipts }: ReceiptTableProps) {
                       className="relative h-10 w-10 cursor-pointer overflow-hidden rounded-md border border-zinc-700 bg-zinc-800"
                       onClick={() => setSelectedReceipt(receipt)}
                     >
-                      {/* Use a placeholder for the thumbnail to avoid authentication issues */}
-                      <div className="flex h-full w-full items-center justify-center text-xs text-zinc-400">
-                        Receipt
+                      {/* Show a thumbnail of the receipt using our proxy */}
+                      <div className="relative h-full w-full">
+                        <Image
+                          src={getProxyImageUrl(receipt.imageUrl) || "/placeholder.svg"}
+                          alt={`Receipt from ${receipt.vendor}`}
+                          fill
+                          className="object-cover"
+                          onError={() => console.log("Thumbnail load error")}
+                          unoptimized
+                        />
                       </div>
                     </div>
                   </TableCell>
@@ -87,21 +104,57 @@ export function ReceiptTable({ receipts }: ReceiptTableProps) {
             </DialogHeader>
             <div className="flex flex-col gap-4">
               <div className="relative aspect-[3/4] w-full overflow-hidden rounded-md border border-zinc-700 bg-zinc-800">
-                {/* Use our API proxy to fetch the image with authentication */}
-                <a
-                  href={`/api/image-proxy?url=${encodeURIComponent(selectedReceipt.imageUrl)}&download=true`}
-                  target="_blank"
-                  className="block h-full w-full"
-                  rel="noreferrer"
-                >
-                  <div className="flex h-full w-full flex-col items-center justify-center p-4 text-center">
-                    <p className="mb-4 text-zinc-300">Click to view or download the receipt image</p>
-                    <Button variant="outline" size="sm">
-                      View Full Image
-                    </Button>
-                  </div>
-                </a>
+                {/* Show the receipt image preview */}
+                <div className="relative h-full w-full">
+                  <Image
+                    src={getProxyImageUrl(selectedReceipt.imageUrl) || "/placeholder.svg"}
+                    alt={`Receipt from ${selectedReceipt.vendor}`}
+                    fill
+                    className="object-contain"
+                    onLoadingComplete={() => setImageLoading(false)}
+                    onError={() => {
+                      setImageLoading(false)
+                      setImageError(true)
+                    }}
+                    unoptimized
+                  />
+
+                  {/* Loading state */}
+                  {imageLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/50">
+                      <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-500 border-t-zinc-100"></div>
+                    </div>
+                  )}
+
+                  {/* Error state */}
+                  {imageError && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/50">
+                      <p className="text-center text-zinc-400">Failed to load image</p>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* Action buttons for the receipt */}
+              <div className="flex justify-between">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(getProxyImageUrl(selectedReceipt.imageUrl), "_blank")}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  View Full Size
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => window.open(getProxyImageUrl(selectedReceipt.imageUrl, true), "_blank")}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download
+                </Button>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-zinc-500">Vendor</p>
