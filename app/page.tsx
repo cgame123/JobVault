@@ -2,10 +2,34 @@ import { DashboardHeader } from "@/components/dashboard-header"
 import { ReceiptTable } from "@/components/receipt-table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { getReceipts } from "@/lib/data"
+import { supabase } from "@/lib/supabase"
 import { formatCurrency } from "@/lib/utils"
+import type { Receipt } from "@/lib/types"
+
+// Function to fetch receipts from Supabase
+async function getReceipts(): Promise<Receipt[]> {
+  const { data, error } = await supabase.from("receipts").select("*").order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("Error fetching receipts:", error)
+    return []
+  }
+
+  return data.map((row) => ({
+    id: row.id,
+    vendor: row.vendor,
+    amount: Number(row.amount),
+    date: row.date,
+    phoneNumber: row.phone_number,
+    staffId: row.staff_id,
+    staffName: row.staff_name,
+    imageUrl: row.image_url,
+    createdAt: row.created_at,
+  }))
+}
 
 export default async function DashboardPage() {
+  // Fetch real receipts from Supabase
   const receipts = await getReceipts()
 
   // Calculate total amount
@@ -15,6 +39,9 @@ export default async function DashboardPage() {
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
   const recentReceipts = receipts.filter((receipt) => new Date(receipt.date) >= thirtyDaysAgo).length
+
+  // Get your Twilio phone number from environment variable
+  const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER || "+1 (888) 639-5525"
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -81,7 +108,7 @@ export default async function DashboardPage() {
             </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-zinc-100">+1 (555) 123-4567</div>
+            <div className="text-2xl font-bold text-zinc-100">{twilioPhoneNumber}</div>
             <p className="text-xs text-zinc-500">Text your receipts to this number</p>
           </CardContent>
         </Card>

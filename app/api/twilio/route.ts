@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getMediaContent } from "@/lib/twilio-client"
-import { storeReceipt } from "@/lib/receipt-storage"
-import { getStaffMemberByPhoneNumber } from "@/lib/staff-storage"
+import { supabase } from "@/lib/supabase"
+import { processReceiptImage } from "@/lib/receipt-processor"
 import { v4 as uuidv4 } from "uuid"
 
 export async function POST(req: NextRequest) {
@@ -43,25 +43,42 @@ export async function POST(req: NextRequest) {
       console.log("✅ Successfully downloaded image, size:", imageBuffer.length, "bytes")
 
       // Try to find a staff member with this phone number
-      const staffMember = await getStaffMemberByPhoneNumber(from)
+      const { data: staffData } = await supabase.from("staff").select("id, name").eq("phone_number", from).maybeSingle()
 
-      // For now, create a basic receipt with mock data
-      // In the future, this would be replaced with AI processing
-      const receiptData = {
-        id: uuidv4(),
-        vendor: body || "Unknown Vendor", // Use the message body as vendor name if available
-        amount: 0, // Placeholder
-        date: new Date().toISOString().split("T")[0], // Today's date
-        phoneNumber: from,
-        staffId: staffMember?.id,
-        staffName: staffMember?.name,
-        imageUrl: mediaUrl, // Store the Twilio URL for now
-        createdAt: new Date().toISOString(),
+      // Process the receipt image with AI
+      console.log("🧠 Processing receipt with AI...")
+      const receiptData = await processReceiptImage(mediaUrl, body)
+      console.log("✅ AI processing complete:", receiptData)
+
+      // Generate a unique ID for the receipt
+      const receiptId = uuidv4()
+
+      // Insert the receipt directly into Supabase
+      const { error: insertError } = await supabase.from("receipts").insert({
+        id: receiptId,
+        vendor: receiptData.vendor,
+        amount: receiptData.amount,
+        date: receiptData.date,
+        phone_number: from,
+        staff_id: staffData?.id || null,
+        staff_name: staffData?.name || null,
+        image_url: mediaUrl,
+        created_at: new Date().toISOString(),
+      })
+
+      if (insertError) {
+        console.error("❌ Error inserting receipt into Supabase:", insertError)
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Failed to store receipt in database",
+            error: insertError.message,
+          },
+          { status: 200 }, // Still return 200 to Twilio
+        )
       }
 
-      // Store the receipt in Supabase
-      const storedReceipt = await storeReceipt(receiptData)
-      console.log("💾 Receipt stored with ID:", storedReceipt.id)
+      console.log("💾 Receipt stored with ID:", receiptId)
 
       // Return a success response
       return NextResponse.json(
@@ -69,9 +86,10 @@ export async function POST(req: NextRequest) {
           success: true,
           message: "Receipt received and stored successfully",
           data: {
-            receiptId: storedReceipt.id,
+            receiptId,
             from,
             messageSid,
+            receiptData,
           },
         },
         { status: 200 },

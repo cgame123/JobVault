@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
 import type { Receipt } from "@/lib/types"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -15,6 +14,13 @@ interface ReceiptTableProps {
 
 export function ReceiptTable({ receipts }: ReceiptTableProps) {
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
+  const [imageError, setImageError] = useState(false)
+
+  // Function to create a proxy URL for Twilio images
+  const getProxyImageUrl = (originalUrl: string) => {
+    // Create a URL that goes through our API proxy
+    return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}`
+  }
 
   return (
     <>
@@ -45,12 +51,10 @@ export function ReceiptTable({ receipts }: ReceiptTableProps) {
                       className="relative h-10 w-10 cursor-pointer overflow-hidden rounded-md border border-zinc-700 bg-zinc-800"
                       onClick={() => setSelectedReceipt(receipt)}
                     >
-                      <Image
-                        src={receipt.imageUrl || "/placeholder.svg"}
-                        alt={`Receipt from ${receipt.vendor}`}
-                        fill
-                        className="object-cover"
-                      />
+                      {/* Use a placeholder for the thumbnail to avoid authentication issues */}
+                      <div className="flex h-full w-full items-center justify-center text-xs text-zinc-400">
+                        Receipt
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className="font-medium text-zinc-100">{receipt.vendor}</TableCell>
@@ -83,12 +87,20 @@ export function ReceiptTable({ receipts }: ReceiptTableProps) {
             </DialogHeader>
             <div className="flex flex-col gap-4">
               <div className="relative aspect-[3/4] w-full overflow-hidden rounded-md border border-zinc-700 bg-zinc-800">
-                <Image
-                  src={selectedReceipt.imageUrl || "/placeholder.svg"}
-                  alt={`Receipt from ${selectedReceipt.vendor}`}
-                  fill
-                  className="object-contain"
-                />
+                {/* Use our API proxy to fetch the image with authentication */}
+                <a
+                  href={`/api/image-proxy?url=${encodeURIComponent(selectedReceipt.imageUrl)}&download=true`}
+                  target="_blank"
+                  className="block h-full w-full"
+                  rel="noreferrer"
+                >
+                  <div className="flex h-full w-full flex-col items-center justify-center p-4 text-center">
+                    <p className="mb-4 text-zinc-300">Click to view or download the receipt image</p>
+                    <Button variant="outline" size="sm">
+                      View Full Image
+                    </Button>
+                  </div>
+                </a>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
