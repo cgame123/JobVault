@@ -1,4 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { getMediaContent } from "@/lib/twilio-client"
+import { storeReceipt } from "@/lib/receipt-storage"
+import { v4 as uuidv4 } from "uuid"
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,25 +10,18 @@ export async function POST(req: NextRequest) {
     // Parse the form data from Twilio
     const formData = await req.formData()
 
-    // Log all form data for debugging
-    console.log("📋 Form data received from Twilio:")
-    const data: Record<string, any> = {}
-    for (const [key, value] of formData.entries()) {
-      console.log(`${key}: ${value}`)
-      data[key] = value
-    }
-
-    // Get the sender's phone number
+    // Log key information
     const from = formData.get("From") as string
-    console.log("📱 Message from:", from)
-
-    // Get the image URL from the MediaUrl0 parameter
-    const mediaUrl = formData.get("MediaUrl0") as string
-    console.log("🖼️ Media URL:", mediaUrl)
-
-    // Get the number of media items
     const numMedia = formData.get("NumMedia") as string
+    const messageSid = formData.get("MessageSid") as string
+    const mediaUrl = formData.get("MediaUrl0") as string
+    const body = formData.get("Body") as string
+
+    console.log("📱 Message from:", from)
+    console.log("📝 Message body:", body)
     console.log("📊 Number of media items:", numMedia)
+    console.log("🆔 Message SID:", messageSid)
+    console.log("🖼️ Original Media URL:", mediaUrl)
 
     // Check if we have an image
     if (!mediaUrl || numMedia === "0") {
@@ -39,36 +35,54 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Try to fetch the image to verify we can access it
-    console.log("🔍 Attempting to fetch the image...")
     try {
-      const imageResponse = await fetch(mediaUrl)
-      if (imageResponse.ok) {
-        console.log("✅ Successfully fetched the image")
-        // Get content type and size for debugging
-        const contentType = imageResponse.headers.get("content-type")
-        const contentLength = imageResponse.headers.get("content-length")
-        console.log(`📝 Image details - Type: ${contentType}, Size: ${contentLength} bytes`)
-      } else {
-        console.log("⚠️ Could not fetch image:", imageResponse.status, imageResponse.statusText)
-      }
-    } catch (fetchError) {
-      console.error("❌ Error fetching image:", fetchError)
-    }
+      // Fetch the image using authenticated request
+      console.log("🔄 Fetching image from Twilio...")
+      const imageBuffer = await getMediaContent(mediaUrl)
+      console.log("✅ Successfully downloaded image, size:", imageBuffer.length, "bytes")
 
-    // Return a success response
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Message received successfully",
-        data: {
-          from,
-          mediaUrl,
-          numMedia,
+      // For now, create a basic receipt with mock data
+      // In the future, this would be replaced with AI processing
+      const receiptData = {
+        id: uuidv4(),
+        vendor: body || "Unknown Vendor", // Use the message body as vendor name if available
+        amount: 0, // Placeholder
+        date: new Date().toISOString().split("T")[0], // Today's date
+        phoneNumber: from,
+        staffId: undefined,
+        staffName: undefined,
+        imageUrl: mediaUrl, // Store the Twilio URL for now
+        createdAt: new Date().toISOString(),
+      }
+
+      // Store the receipt
+      const storedReceipt = storeReceipt(receiptData)
+      console.log("💾 Receipt stored with ID:", storedReceipt.id)
+
+      // Return a success response
+      return NextResponse.json(
+        {
+          success: true,
+          message: "Receipt received and stored successfully",
+          data: {
+            receiptId: storedReceipt.id,
+            from,
+            messageSid,
+          },
         },
-      },
-      { status: 200 },
-    )
+        { status: 200 },
+      )
+    } catch (mediaError) {
+      console.error("❌ Error handling media:", mediaError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error processing media, but message was received",
+          error: String(mediaError),
+        },
+        { status: 200 },
+      )
+    }
   } catch (error) {
     console.error("❌ Error in Twilio webhook:", error)
 
