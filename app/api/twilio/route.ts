@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getMediaContent } from "@/lib/twilio-client"
 import { storeReceipt } from "@/lib/receipt-storage"
+import { getStaffMemberByPhoneNumber } from "@/lib/staff-storage"
 import { v4 as uuidv4 } from "uuid"
 
 export async function POST(req: NextRequest) {
@@ -41,6 +42,9 @@ export async function POST(req: NextRequest) {
       const imageBuffer = await getMediaContent(mediaUrl)
       console.log("✅ Successfully downloaded image, size:", imageBuffer.length, "bytes")
 
+      // Try to find a staff member with this phone number
+      const staffMember = await getStaffMemberByPhoneNumber(from)
+
       // For now, create a basic receipt with mock data
       // In the future, this would be replaced with AI processing
       const receiptData = {
@@ -49,14 +53,14 @@ export async function POST(req: NextRequest) {
         amount: 0, // Placeholder
         date: new Date().toISOString().split("T")[0], // Today's date
         phoneNumber: from,
-        staffId: undefined,
-        staffName: undefined,
+        staffId: staffMember?.id,
+        staffName: staffMember?.name,
         imageUrl: mediaUrl, // Store the Twilio URL for now
         createdAt: new Date().toISOString(),
       }
 
-      // Store the receipt
-      const storedReceipt = storeReceipt(receiptData)
+      // Store the receipt in Supabase
+      const storedReceipt = await storeReceipt(receiptData)
       console.log("💾 Receipt stored with ID:", storedReceipt.id)
 
       // Return a success response

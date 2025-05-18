@@ -3,8 +3,8 @@ import { getAllReceipts } from "@/lib/receipt-storage"
 
 export async function GET() {
   try {
-    // Get all receipts from storage
-    const receipts = getAllReceipts()
+    // Get all receipts from Supabase
+    const receipts = await getAllReceipts()
 
     // Return the receipts as JSON
     return NextResponse.json({
