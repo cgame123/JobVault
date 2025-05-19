@@ -11,9 +11,19 @@ import { RefreshButton } from "@/components/refresh-button"
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
-// Function to fetch receipts from Supabase
+// Function to fetch receipts from Supabase with staff information
 async function getReceipts(): Promise<Receipt[]> {
-  const { data, error } = await supabase.from("receipts").select("*").order("created_at", { ascending: false })
+  // Join receipts with staff to get property information
+  const { data, error } = await supabase
+    .from("receipts")
+    .select(`
+      *,
+      staff:staff_id (
+        name,
+        property
+      )
+    `)
+    .order("created_at", { ascending: false })
 
   if (error) {
     console.error("Error fetching receipts:", error)
@@ -27,8 +37,8 @@ async function getReceipts(): Promise<Receipt[]> {
     date: row.date,
     phoneNumber: row.phone_number,
     staffId: row.staff_id,
-    staffName: row.staff_name,
-    property: row.property,
+    staffName: row.staff_name || (row.staff ? row.staff.name : null),
+    property: row.staff ? row.staff.property : null,
     imageUrl: row.image_url,
     createdAt: row.created_at,
   }))

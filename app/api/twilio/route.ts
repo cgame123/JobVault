@@ -48,11 +48,16 @@ export async function POST(req: NextRequest) {
       console.log("✅ Successfully downloaded image, size:", imageBuffer.length, "bytes")
 
       // Try to find a staff member with this phone number
-      const { data: staffData } = await supabase
+      const { data: staffData, error: staffError } = await supabase
         .from("staff")
         .select("id, name, property")
         .eq("phone_number", from)
         .maybeSingle()
+
+      if (staffError) {
+        console.error("❌ Error fetching staff member:", staffError)
+        // Still process the receipt, but without staff info
+      }
 
       // Process the receipt image with AI
       console.log("🧠 Processing receipt with AI...")
@@ -63,6 +68,7 @@ export async function POST(req: NextRequest) {
       const receiptId = uuidv4()
 
       // Insert the receipt directly into Supabase
+      // Note: We're only storing staff_id, not property (which comes from staff)
       const { error: insertError } = await supabase.from("receipts").insert({
         id: receiptId,
         vendor: receiptData.vendor,
@@ -71,7 +77,6 @@ export async function POST(req: NextRequest) {
         phone_number: from,
         staff_id: staffData?.id || null,
         staff_name: staffData?.name || null,
-        property: staffData?.property || null,
         image_url: mediaUrl,
         created_at: new Date().toISOString(),
       })
@@ -99,10 +104,9 @@ export async function POST(req: NextRequest) {
       const propertyInfo = staffData?.property ? ` for ${staffData.property}` : ""
       const amountText = receiptData.amount > 0 ? ` for ${formatCurrency(receiptData.amount)}` : ""
 
-      await sendConfirmationSMS(
-        from,
-        `Thanks${staffName}! Your receipt from ${receiptData.vendor}${amountText}${propertyInfo} has been received and processed. Receipt ID: ${receiptId.substring(0, 8)}`,
-      )
+      const confirmationMessage = `Thanks${staffName}! Your receipt from ${receiptData.vendor}${amountText}${propertyInfo} has been received and processed. Receipt ID: ${receiptId.substring(0, 8)}`
+
+      await sendConfirmationSMS(from, confirmationMessage)
 
       // Return a success response
       return NextResponse.json(

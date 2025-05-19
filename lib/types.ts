@@ -6,7 +6,7 @@ export interface Receipt {
   phoneNumber: string
   staffId?: string
   staffName?: string
-  property?: string
+  property?: string // This comes from the staff table, not stored in receipts
   imageUrl: string
   createdAt: string
 }
