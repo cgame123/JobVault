@@ -230,8 +230,9 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
         return
       }
 
-      const response = await fetch(`/api/receipts/${receipt.id}/details`, {
-        method: "PATCH",
+      // Use the new update endpoint with POST method
+      const response = await fetch(`/api/receipts/${receipt.id}/update`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
@@ -242,11 +243,26 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
         }),
       })
 
-      const data = await response.json()
-
+      // Check for HTTP errors
       if (!response.ok) {
-        throw new Error(data.error || "Failed to update receipt details")
+        const errorText = await response.text()
+        console.error("Error response:", errorText)
+
+        let errorMessage = "Failed to update receipt details"
+        try {
+          const errorData = JSON.parse(errorText)
+          if (errorData.error) {
+            errorMessage = errorData.error
+          }
+        } catch (e) {
+          // If we can't parse the error as JSON, use the raw text
+          errorMessage = errorText || "Unknown error"
+        }
+
+        throw new Error(errorMessage)
       }
+
+      const data = await response.json()
 
       // Update the local state
       setReceipt({
