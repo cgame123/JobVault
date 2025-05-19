@@ -3,7 +3,6 @@ import { ReceiptFilters } from "@/components/receipt-filters"
 import { supabase } from "@/lib/supabase"
 import type { Receipt } from "@/lib/types"
 import { RefreshButton } from "@/components/refresh-button"
-import { SchemaRefreshButton } from "@/components/schema-refresh-button"
 
 // Disable caching for this route
 export const dynamic = "force-dynamic"
@@ -114,7 +113,7 @@ async function getReceipts(searchParams: {
     property: row.staff ? row.staff.property : null,
     imageUrl: row.image_url,
     createdAt: row.created_at,
-    status: row.status || "submitted",
+    status: row.status || "processing",
     paid: row.paid || false,
   }))
 }
@@ -146,7 +145,6 @@ export default async function ReceiptsPage({
           <p className="text-zinc-400">View and manage all receipt submissions.</p>
         </div>
         <div className="flex items-center gap-2">
-          <SchemaRefreshButton />
           <RefreshButton />
         </div>
       </div>

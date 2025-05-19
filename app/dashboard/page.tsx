@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatCurrency } from "@/lib/utils"
 import { PropertyMetricsChart } from "@/components/property-metrics-chart"
-import { PropertyTable } from "@/components/property-table"
 import { DashboardSkeleton } from "@/components/dashboard-skeleton"
 import { RefreshButton } from "@/components/refresh-button"
 
@@ -209,7 +208,6 @@ async function PropertyMetricsContent() {
       <Tabs defaultValue="chart" className="w-full">
         <TabsList className="bg-zinc-900/50">
           <TabsTrigger value="chart">Chart View</TabsTrigger>
-          <TabsTrigger value="table">Table View</TabsTrigger>
           <TabsTrigger value="activity">Recent Activity</TabsTrigger>
         </TabsList>
         <TabsContent value="chart" className="mt-4">
@@ -226,9 +224,6 @@ async function PropertyMetricsContent() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-        <TabsContent value="table" className="mt-4">
-          <PropertyTable properties={properties} />
         </TabsContent>
         <TabsContent value="activity" className="mt-4">
           <Card className="border-zinc-800 bg-zinc-900/50 shadow-lg">

@@ -29,7 +29,7 @@ export function ReceiptActions({ receipt }: ReceiptActionsProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [status, setStatus] = useState(receipt.status || "submitted")
+  const [status, setStatus] = useState(receipt.status || "processing")
   const [paid, setPaid] = useState(receipt.paid || false)
   const router = useRouter()
   const { toast } = useToast()
@@ -37,12 +37,8 @@ export function ReceiptActions({ receipt }: ReceiptActionsProps) {
   // Get status badge class based on status
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
-      case "submitted":
-        return "bg-zinc-700/50 text-zinc-300 border-zinc-600"
       case "processing":
         return "bg-blue-900/30 text-blue-300 border-blue-800"
-      case "needs_review":
-        return "bg-amber-900/30 text-amber-300 border-amber-800"
       case "approved":
         return "bg-green-900/30 text-green-300 border-green-800"
       case "rejected":
@@ -50,7 +46,7 @@ export function ReceiptActions({ receipt }: ReceiptActionsProps) {
       case "duplicate":
         return "bg-purple-900/30 text-purple-300 border-purple-800"
       default:
-        return "bg-zinc-700/50 text-zinc-300 border-zinc-600"
+        return "bg-blue-900/30 text-blue-300 border-blue-800" // Default to processing
     }
   }
 
@@ -174,22 +170,10 @@ export function ReceiptActions({ receipt }: ReceiptActionsProps) {
                   </SelectTrigger>
                   <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
                     <SelectItem
-                      value="submitted"
-                      className="bg-zinc-700/50 text-zinc-300 focus:bg-zinc-700 focus:text-zinc-100"
-                    >
-                      Submitted
-                    </SelectItem>
-                    <SelectItem
                       value="processing"
                       className="bg-blue-900/30 text-blue-300 focus:bg-blue-900/50 focus:text-blue-100"
                     >
                       Processing
-                    </SelectItem>
-                    <SelectItem
-                      value="needs_review"
-                      className="bg-amber-900/30 text-amber-300 focus:bg-amber-900/50 focus:text-amber-100"
-                    >
-                      Needs Review
                     </SelectItem>
                     <SelectItem
                       value="approved"
