@@ -59,10 +59,10 @@ export async function POST(req: NextRequest) {
         // Still process the receipt, but without staff info
       }
 
-      // Process the receipt image with AI
-      console.log("🧠 Processing receipt with AI...")
+      // Process the receipt image (basic processing without AI)
+      console.log("📝 Processing receipt...")
       const receiptData = await processReceiptImage(mediaUrl, body)
-      console.log("✅ AI processing complete:", receiptData)
+      console.log("✅ Processing complete:", receiptData)
 
       // Generate a unique ID for the receipt
       const receiptId = uuidv4()
@@ -102,9 +102,8 @@ export async function POST(req: NextRequest) {
       // Send confirmation SMS
       const staffName = staffData?.name ? ` ${staffData.name}` : ""
       const propertyInfo = staffData?.property ? ` for ${staffData.property}` : ""
-      const amountText = receiptData.amount > 0 ? ` for ${formatCurrency(receiptData.amount)}` : ""
 
-      const confirmationMessage = `Thanks${staffName}! Your receipt from ${receiptData.vendor}${amountText}${propertyInfo} has been received and processed. Receipt ID: ${receiptId.substring(0, 8)}`
+      const confirmationMessage = `Thanks${staffName}! Your receipt${propertyInfo} has been received and stored. Receipt ID: ${receiptId.substring(0, 8)}`
 
       await sendConfirmationSMS(from, confirmationMessage)
 

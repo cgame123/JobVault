@@ -10,8 +10,14 @@ export function RefreshButton() {
   const handleRefresh = async () => {
     setIsRefreshing(true)
 
-    // Force a hard refresh of the page
-    window.location.reload()
+    try {
+      // Force a hard refresh of the page with cache busting
+      window.location.href = window.location.pathname + "?t=" + new Date().getTime()
+    } catch (error) {
+      console.error("Error refreshing:", error)
+      // Fallback to simple reload
+      window.location.reload()
+    }
 
     // This won't actually run due to the page reload, but it's here for completeness
     setTimeout(() => {
