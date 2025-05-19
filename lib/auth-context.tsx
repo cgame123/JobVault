@@ -3,16 +3,17 @@
 import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { isSupabaseConfigured, getSupabase } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase"
 import type { Session, User } from "@supabase/supabase-js"
+import { useRouter } from "next/navigation"
 
 type AuthContextType = {
   user: User | null
   session: Session | null
   isLoading: boolean
   error: string | null
-  isConfigured: boolean
   signOut: () => Promise<void>
+  refreshSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -20,8 +21,8 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   isLoading: true,
   error: null,
-  isConfigured: false,
   signOut: async () => {},
+  refreshSession: async () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -29,72 +30,105 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  // Function to refresh the session
+  const refreshSession = async () => {
+    try {
+      console.log("Refreshing session...")
+      const { data, error } = await supabase.auth.getSession()
+
+      if (error) {
+        console.error("Error refreshing session:", error)
+        setError(error.message)
+        return
+      }
+
+      console.log("Session data:", data)
+      setSession(data.session)
+      setUser(data.session?.user || null)
+
+      if (data.session) {
+        console.log("User is authenticated:", data.session.user.email)
+      } else {
+        console.log("No active session found")
+      }
+    } catch (err) {
+      console.error("Unexpected error refreshing session:", err)
+      setError("Failed to refresh session")
+    }
+  }
 
   useEffect(() => {
-    // If Supabase is not configured, don't try to initialize auth
-    if (!isSupabaseConfigured) {
-      setIsLoading(false)
-      return
-    }
+    // Get the current session
+    const getSession = async () => {
+      try {
+        setIsLoading(true)
+        console.log("Initial session check...")
 
-    try {
-      const supabase = getSupabase()
+        const { data, error } = await supabase.auth.getSession()
 
-      // Get the current session
-      const getSession = async () => {
-        try {
-          const { data, error } = await supabase.auth.getSession()
-          if (error) {
-            console.error("Error getting session:", error)
-            setError(error.message)
-          }
+        if (error) {
+          console.error("Error getting session:", error)
+          setError(error.message)
+        } else {
+          console.log("Initial session data:", data)
           setSession(data.session)
           setUser(data.session?.user || null)
-        } catch (err) {
-          console.error("Failed to initialize auth:", err)
-          setError("Authentication initialization failed. Please check your configuration.")
-        } finally {
-          setIsLoading(false)
+
+          if (data.session) {
+            console.log("User is authenticated:", data.session.user.email)
+          } else {
+            console.log("No active session found")
+          }
         }
-      }
-
-      getSession()
-
-      // Listen for auth changes
-      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-        console.log(`Auth event: ${event}`)
-        setSession(session)
-        setUser(session?.user || null)
+      } catch (err) {
+        console.error("Failed to initialize auth:", err)
+        setError("Authentication initialization failed")
+      } finally {
         setIsLoading(false)
-      })
-
-      return () => {
-        authListener.subscription.unsubscribe()
       }
-    } catch (err) {
-      console.error("Failed to set up auth:", err)
-      setError("Authentication setup failed. Please check your configuration.")
-      setIsLoading(false)
     }
-  }, [])
+
+    getSession()
+
+    // Listen for auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, newSession) => {
+      console.log(`Auth event: ${event}`, newSession)
+
+      setSession(newSession)
+      setUser(newSession?.user || null)
+      setIsLoading(false)
+
+      // Force a router refresh when auth state changes
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        console.log("User signed in, refreshing router...")
+        router.refresh()
+      }
+
+      if (event === "SIGNED_OUT") {
+        console.log("User signed out, refreshing router...")
+        router.refresh()
+      }
+    })
+
+    return () => {
+      authListener.subscription.unsubscribe()
+    }
+  }, [router])
 
   const signOut = async () => {
-    if (!isSupabaseConfigured) {
-      setError("Authentication is not configured")
-      return
-    }
-
     try {
-      const supabase = getSupabase()
       await supabase.auth.signOut()
+      router.push("/login")
     } catch (err) {
       console.error("Error signing out:", err)
-      setError("Failed to sign out. Please try again.")
+      setError("Failed to sign out")
     }
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, error, isConfigured: isSupabaseConfigured, signOut }}>
+    <AuthContext.Provider value={{ user, session, isLoading, error, signOut, refreshSession }}>
       {children}
     </AuthContext.Provider>
   )
