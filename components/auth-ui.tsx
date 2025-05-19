@@ -10,16 +10,18 @@ import { ExclamationTriangleIcon } from "@radix-ui/react-icons"
 export function AuthUI() {
   const [error, setError] = useState<string | null>(null)
   const [supabase, setSupabase] = useState<any>(null)
-  const [origin, setOrigin] = useState<string>("")
+  const [redirectUrl, setRedirectUrl] = useState<string>("")
 
   useEffect(() => {
     try {
       const supabaseClient = getSupabase()
       setSupabase(supabaseClient)
 
-      // Set origin safely inside useEffect
+      // Set redirect URL safely inside useEffect
       if (typeof window !== "undefined") {
-        setOrigin(window.location.origin)
+        // Use absolute URL for the callback
+        const baseUrl = window.location.origin
+        setRedirectUrl(`${baseUrl}/auth/callback`)
       }
     } catch (err) {
       console.error("Failed to initialize Supabase client:", err)
@@ -66,7 +68,7 @@ export function AuthUI() {
     )
   }
 
-  if (!supabase || !origin) {
+  if (!supabase || !redirectUrl) {
     return (
       <div className="flex h-40 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-500 border-t-zinc-100"></div>
@@ -75,12 +77,17 @@ export function AuthUI() {
   }
 
   return (
-    <Auth
-      supabaseClient={supabase}
-      appearance={{ theme: ThemeSupa, variables: customTheme }}
-      theme="dark"
-      providers={[]}
-      redirectTo={`${origin}/auth/callback`}
-    />
+    <div className="auth-container">
+      <Auth
+        supabaseClient={supabase}
+        appearance={{ theme: ThemeSupa, variables: customTheme }}
+        theme="dark"
+        providers={[]}
+        redirectTo={redirectUrl}
+      />
+      <div className="mt-4 text-center text-sm text-zinc-500">
+        <p>If you encounter issues with email confirmation links, please contact support.</p>
+      </div>
+    </div>
   )
 }
