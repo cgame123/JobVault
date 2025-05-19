@@ -1,42 +1,34 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
+export function middleware(request: NextRequest) {
+  // Get the pathname
+  const path = request.nextUrl.pathname
 
-  // Create a Supabase client for the middleware
-  const supabase = createMiddlewareClient({ req, res })
+  // Define public paths that don't require authentication
+  const isPublicPath =
+    path === "/login" ||
+    path === "/demo-login" ||
+    path === "/auth/callback" ||
+    path.startsWith("/auth-debug") ||
+    path.startsWith("/api/")
 
-  // Refresh the session if it exists
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  // Check if user is authenticated via demo login
+  const isDemoAuthenticated = request.cookies.get("demo-auth")?.value === "true"
 
-  // Log the session status for debugging
-  console.log("Middleware session check:", session ? "Authenticated" : "Not authenticated")
-
-  const isAuthRoute = req.nextUrl.pathname === "/login"
-  const isProtectedRoute = req.nextUrl.pathname === "/" || req.nextUrl.pathname.startsWith("/staff")
-
-  // If user is signed in and trying to access login page, redirect to dashboard
-  if (session && isAuthRoute) {
-    console.log("Redirecting authenticated user from login to dashboard")
-    return NextResponse.redirect(new URL("/", req.url))
+  // If the path is not public and user is not authenticated, redirect to login
+  if (!isPublicPath && !isDemoAuthenticated) {
+    return NextResponse.redirect(new URL("/demo-login", request.url))
   }
 
-  // If user is not signed in and trying to access protected route, redirect to login
-  if (!session && isProtectedRoute) {
-    console.log("Redirecting unauthenticated user to login")
-    const redirectUrl = new URL("/login", req.url)
-    redirectUrl.searchParams.set("redirectTo", req.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
+  // If the path is login and user is authenticated, redirect to dashboard
+  if (path === "/login" && isDemoAuthenticated) {
+    return NextResponse.redirect(new URL("/", request.url))
   }
 
-  return res
+  return NextResponse.next()
 }
 
-// Specify which routes should be processed by the middleware
 export const config = {
-  matcher: ["/", "/login", "/staff/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.png$).*)"],
 }
