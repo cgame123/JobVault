@@ -5,10 +5,14 @@ import { getMediaContent } from "@/lib/twilio-client"
 
 // Sample receipt URLs from your project
 const SAMPLE_RECEIPTS = {
-  "home-depot": "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/attachments/gen-images/public/home-depot-receipt-MDClilwcaMC7elv9FyaHRZ9buOu03E.png",
-  "ace-hardware": "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/attachments/gen-images/public/ace-hardware-receipt-JXnw7ccgpNJ5m64ptfQGSPFy3zpy20.png",
-  "walmart": "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/attachments/gen-images/public/walmart-receipt-j51a5vQ3zIRlUAcwOZ1GLBNZdO5xDp.png",
-  "target": "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/attachments/gen-images/public/target-receipt-fGfHrJHDW3UhNPZnNghaCRLWIphDbM.png",
+  "home-depot":
+    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/attachments/gen-images/public/home-depot-receipt-MDClilwcaMC7elv9FyaHRZ9buOu03E.png",
+  "ace-hardware":
+    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/attachments/gen-images/public/ace-hardware-receipt-JXnw7ccgpNJ5m64ptfQGSPFy3zpy20.png",
+  walmart:
+    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/attachments/gen-images/public/walmart-receipt-j51a5vQ3zIRlUAcwOZ1GLBNZdO5xDp.png",
+  target:
+    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/attachments/gen-images/public/target-receipt-fGfHrJHDW3UhNPZnNghaCRLWIphDbM.png",
 }
 
 export async function GET(req: Request) {
@@ -100,4 +104,46 @@ export async function GET(req: Request) {
       let date = new Date().toISOString().split("T")[0] // Default to today
       if (result.date) {
         // Try to parse the date
-        const parsedDate = ne
+        const parsedDate = new Date(result.date)
+        if (!isNaN(parsedDate.getTime())) {
+          date = parsedDate.toISOString().split("T")[0]
+        }
+      }
+
+      const extractedData = {
+        vendor,
+        amount,
+        date,
+      }
+
+      console.log("Extracted receipt data:", extractedData)
+
+      return NextResponse.json({
+        success: true,
+        message: "Receipt processed successfully",
+        data: extractedData,
+        imageUsed: imageUrl,
+      })
+    } catch (error) {
+      console.error("Error processing image:", error)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error processing image",
+          error: String(error),
+        },
+        { status: 500 },
+      )
+    }
+  } catch (error) {
+    console.error("Error in receipt test endpoint:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error in receipt test endpoint",
+        error: String(error),
+      },
+      { status: 500 },
+    )
+  }
+}

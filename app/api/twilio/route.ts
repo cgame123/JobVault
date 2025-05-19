@@ -57,10 +57,10 @@ export async function POST(req: NextRequest) {
         // Still process the receipt, but without staff info
       }
 
-      // Process the receipt image (basic processing without AI)
-      console.log("📝 Processing receipt...")
+      // Process the receipt image with AI
+      console.log("🤖 Processing receipt with AI...")
       const receiptData = await processReceiptImage(mediaUrl, body)
-      console.log("✅ Processing complete:", receiptData)
+      console.log("✅ AI processing complete:", receiptData)
 
       // Generate a unique ID for the receipt
       const receiptId = uuidv4()
@@ -138,12 +138,4 @@ export async function POST(req: NextRequest) {
       { status: 200 },
     )
   }
-}
-
-// Helper function to format currency
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount)
 }
