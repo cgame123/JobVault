@@ -1,28 +1,19 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-// Create a new Supabase client for this request
-// This ensures we have a fresh client for each request
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || "", process.env.SUPABASE_SERVICE_ROLE_KEY || "")
-
 export async function POST(request: Request, { params }: { params: { id: string } }) {
+  console.log(`[API] Updating receipt with ID: ${params.id}`)
+
+  // Create a new Supabase client for this request
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || "", process.env.SUPABASE_SERVICE_ROLE_KEY || "")
+
   try {
-    const { id } = params
-    console.log(`Updating receipt with ID: ${id}`)
-
     // Parse request body
-    let body
-    try {
-      body = await request.json()
-    } catch (e) {
-      console.error("Failed to parse request body:", e)
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
-    }
-
-    console.log("Request body:", body)
+    const body = await request.json()
+    console.log("[API] Request body:", body)
 
     // Extract and validate fields
-    const { vendor, amount, date } = body
+    const { vendor, amount, date, staffId, property } = body
 
     if (!vendor || vendor.trim() === "") {
       return NextResponse.json({ error: "Vendor is required" }, { status: 400 })
@@ -37,25 +28,40 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return NextResponse.json({ error: "Date is required" }, { status: 400 })
     }
 
+    // Prepare update data
+    const updateData: any = {
+      vendor: vendor.trim(),
+      amount: numAmount,
+      date,
+    }
+
+    // Add staff_id if provided
+    if (staffId) {
+      updateData.staff_id = staffId
+    }
+
     // Update receipt in database
-    const { data, error } = await supabase
-      .from("receipts")
-      .update({
-        vendor: vendor.trim(),
-        amount: numAmount,
-        date,
-      })
-      .eq("id", id)
-      .select()
+    const { data, error } = await supabase.from("receipts").update(updateData).eq("id", params.id).select()
 
     if (error) {
-      console.error("Database error:", error)
+      console.error("[API] Database error:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // If property is provided and staff_id is provided, update the staff's property
+    if (property && staffId) {
+      const { error: staffError } = await supabase.from("staff").update({ property }).eq("id", staffId)
+
+      if (staffError) {
+        console.error("[API] Error updating staff property:", staffError)
+        // Don't return an error here, just log it
+      }
+    }
+
+    console.log("[API] Update successful:", data)
     return NextResponse.json({ success: true, data })
   } catch (error) {
-    console.error("Unhandled error:", error)
+    console.error("[API] Unhandled error:", error)
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
   }
 }

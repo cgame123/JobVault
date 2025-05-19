@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
@@ -8,264 +8,32 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Download, ExternalLink, MapPin, User, Edit, Save, X, AlertCircle } from "lucide-react"
+import { ArrowLeft, Download, ExternalLink, MapPin, User } from "lucide-react"
 import { ReceiptActions } from "@/components/receipt-actions"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useState, useEffect } from "react"
-import { useToast } from "@/components/ui/use-toast"
-import { Input } from "@/components/ui/input"
 
-// Function to create a proxy URL for Twilio images
-function getProxyImageUrl(originalUrl: string, download = false) {
-  if (!originalUrl) return "/placeholder.svg"
-  return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}${download ? "&download=true" : ""}`
+interface Receipt {
+  id: string
+  vendor: string
+  amount: number
+  date: string
+  phoneNumber: string
+  staffId: string
+  staffName: string
+  staffPhone: string
+  staffRole: string
+  property: string
+  imageUrl: string
+  createdAt: string
+  status: string
+  paid: boolean
 }
 
 export default function ReceiptDetailsPage({ params }: { params: { id: string } }) {
-  const [receipt, setReceipt] = useState<any>(null)
+  const [receipt, setReceipt] = useState<Receipt | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [editedReceipt, setEditedReceipt] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const { toast } = useToast()
   const router = useRouter()
 
-  // Get status badge class based on status
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case "processing":
-        return "bg-blue-900/30 text-blue-300 border-blue-800"
-      case "approved":
-        return "bg-green-900/30 text-green-300 border-green-800"
-      case "rejected":
-        return "bg-red-900/30 text-red-300 border-red-800"
-      case "duplicate":
-        return "bg-purple-900/30 text-purple-300 border-purple-800"
-      default:
-        return "bg-blue-900/30 text-blue-300 border-blue-800" // Default to processing
-    }
-  }
-
-  // Get payment badge class based on paid status
-  const getPaymentBadgeClass = (paid: boolean) => {
-    return paid ? "bg-green-900/30 text-green-300 border-green-800" : "bg-zinc-700/50 text-zinc-300 border-zinc-600"
-  }
-
-  // Handle status update
-  const handleStatusUpdate = async (status: string) => {
-    if (!receipt) return
-    setIsSubmitting(true)
-
-    try {
-      // Try the direct update endpoint
-      const response = await fetch(`/api/receipts/${receipt.id}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to update receipt status")
-      }
-
-      const data = await response.json()
-
-      // Update the local state
-      setReceipt({
-        ...receipt,
-        status,
-      })
-
-      // Show success message
-      toast({
-        title: "Status updated",
-        description: `Receipt status has been updated to ${status}.`,
-      })
-    } catch (error) {
-      console.error("Error updating receipt status:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update receipt status.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  // Handle payment update
-  const handlePaymentUpdate = async (paid: boolean) => {
-    if (!receipt) return
-    setIsSubmitting(true)
-
-    try {
-      // Try the direct update endpoint
-      const response = await fetch(`/api/receipts/${receipt.id}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ paid }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to update payment status")
-      }
-
-      const data = await response.json()
-
-      // Update the local state
-      setReceipt({
-        ...receipt,
-        paid,
-      })
-
-      // Show success message
-      toast({
-        title: "Payment status updated",
-        description: `Receipt has been marked as ${paid ? "paid" : "pending"}.`,
-      })
-    } catch (error) {
-      console.error("Error updating payment status:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update payment status.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  // Handle receipt details update
-  const handleSaveDetails = async () => {
-    if (!receipt || !editedReceipt) return
-    setIsSubmitting(true)
-    setSaveError(null)
-
-    try {
-      console.log("Saving receipt details:", editedReceipt)
-
-      // Validate inputs
-      if (!editedReceipt.vendor.trim()) {
-        setSaveError("Vendor name is required")
-        setIsSubmitting(false)
-        return
-      }
-
-      if (isNaN(editedReceipt.amount) || Number.parseFloat(editedReceipt.amount) <= 0) {
-        setSaveError("Amount must be a positive number")
-        setIsSubmitting(false)
-        return
-      }
-
-      if (!editedReceipt.date) {
-        setSaveError("Date is required")
-        setIsSubmitting(false)
-        return
-      }
-
-      // Use the new update endpoint with POST method
-      const response = await fetch(`/api/receipts/${receipt.id}/update`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          vendor: editedReceipt.vendor,
-          amount: Number.parseFloat(editedReceipt.amount),
-          date: editedReceipt.date,
-        }),
-      })
-
-      // Check for HTTP errors
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error("Error response:", errorText)
-
-        let errorMessage = "Failed to update receipt details"
-        try {
-          const errorData = JSON.parse(errorText)
-          if (errorData.error) {
-            errorMessage = errorData.error
-          }
-        } catch (e) {
-          // If we can't parse the error as JSON, use the raw text
-          errorMessage = errorText || "Unknown error"
-        }
-
-        throw new Error(errorMessage)
-      }
-
-      const data = await response.json()
-
-      // Update the local state
-      setReceipt({
-        ...receipt,
-        vendor: editedReceipt.vendor,
-        amount: Number.parseFloat(editedReceipt.amount),
-        date: editedReceipt.date,
-      })
-
-      // Show success message
-      toast({
-        title: "Receipt updated",
-        description: "Receipt details have been updated successfully.",
-      })
-
-      // Exit edit mode
-      setIsEditing(false)
-    } catch (error) {
-      console.error("Error updating receipt details:", error)
-      setSaveError(error instanceof Error ? error.message : "Failed to update receipt details")
-      toast({
-        title: "Error",
-        description: "Failed to update receipt details.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  // Handle input change for edited receipt
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setEditedReceipt({
-      ...editedReceipt,
-      [name]: value,
-    })
-  }
-
-  // Toggle edit mode
-  const toggleEditMode = () => {
-    if (isEditing) {
-      // Cancel editing - reset to original values
-      setEditedReceipt({
-        vendor: receipt.vendor,
-        amount: receipt.amount,
-        date: receipt.date,
-      })
-      setIsEditing(false)
-      setSaveError(null)
-    } else {
-      // Start editing - copy current values
-      setEditedReceipt({
-        vendor: receipt.vendor,
-        amount: receipt.amount,
-        date: receipt.date,
-      })
-      setIsEditing(true)
-    }
-  }
-
-  // Fetch receipt data
   useEffect(() => {
     async function loadReceipt() {
       setIsLoading(true)
@@ -273,25 +41,12 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
 
       try {
         const response = await fetch(`/api/receipts/${params.id}`)
-
         if (!response.ok) {
           throw new Error("Failed to fetch receipt")
         }
 
         const data = await response.json()
-
-        if (!data) {
-          setError("Receipt not found. It may have been deleted or you don't have permission to view it.")
-          setIsLoading(false)
-          return
-        }
-
         setReceipt(data)
-        setEditedReceipt({
-          vendor: data.vendor || "",
-          amount: data.amount || 0,
-          date: data.date || new Date().toISOString().split("T")[0],
-        })
       } catch (err) {
         console.error("Error in loadReceipt:", err)
         setError("An error occurred while loading the receipt. Please try again.")
@@ -303,7 +58,6 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
     loadReceipt()
   }, [params.id])
 
-  // Show loading state
   if (isLoading) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
@@ -314,7 +68,6 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
     )
   }
 
-  // Show error state
   if (error || !receipt) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
@@ -353,35 +106,6 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
           </Link>
         </Button>
         <div className="flex gap-2">
-          {isEditing ? (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleEditMode}
-                className="text-zinc-400 hover:text-zinc-100"
-                disabled={isSubmitting}
-              >
-                <X className="mr-2 h-4 w-4" />
-                Cancel
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleSaveDetails}
-                className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
-                disabled={isSubmitting}
-              >
-                <Save className="mr-2 h-4 w-4" />
-                {isSubmitting ? "Saving..." : "Save Changes"}
-              </Button>
-            </>
-          ) : (
-            <Button variant="outline" size="sm" onClick={toggleEditMode} className="text-zinc-400 hover:text-zinc-100">
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Details
-            </Button>
-          )}
           <ReceiptActions receipt={receipt} />
         </div>
       </div>
@@ -396,7 +120,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
           <CardContent>
             <div className="relative aspect-[3/4] w-full overflow-hidden rounded-md border border-zinc-700 bg-zinc-800">
               <Image
-                src={getProxyImageUrl(receipt.imageUrl) || "/placeholder.svg"}
+                src={receipt.imageUrl || "/placeholder.svg"}
                 alt={`Receipt from ${receipt.vendor}`}
                 fill
                 className="object-contain"
@@ -408,7 +132,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(getProxyImageUrl(receipt.imageUrl), "_blank")}
+              onClick={() => window.open(receipt.imageUrl, "_blank")}
               className="text-zinc-400 hover:text-zinc-100"
             >
               <ExternalLink className="mr-2 h-4 w-4" />
@@ -417,7 +141,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(getProxyImageUrl(receipt.imageUrl, true), "_blank")}
+              onClick={() => window.open(receipt.imageUrl, "_blank")}
               className="text-zinc-400 hover:text-zinc-100"
             >
               <Download className="mr-2 h-4 w-4" />
@@ -433,140 +157,25 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
             <CardDescription className="text-zinc-400">Submitted on {formatDate(receipt.createdAt)}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Save Error Message */}
-            {saveError && (
-              <div className="rounded-md bg-red-900/20 border border-red-800 p-3 flex items-start">
-                <AlertCircle className="h-5 w-5 text-red-400 mr-2 mt-0.5" />
-                <div className="text-sm text-red-300">{saveError}</div>
-              </div>
-            )}
-
             {/* Basic receipt info */}
             <div className="space-y-4">
-              {isEditing ? (
-                <>
-                  <div className="space-y-2">
-                    <label htmlFor="vendor" className="text-sm font-medium text-zinc-400">
-                      Vendor
-                    </label>
-                    <Input
-                      id="vendor"
-                      name="vendor"
-                      value={editedReceipt.vendor}
-                      onChange={handleInputChange}
-                      className="border-zinc-700 bg-zinc-800 text-zinc-100"
-                      placeholder="Enter vendor name"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label htmlFor="amount" className="text-sm font-medium text-zinc-400">
-                      Amount
-                    </label>
-                    <Input
-                      id="amount"
-                      name="amount"
-                      type="number"
-                      step="0.01"
-                      value={editedReceipt.amount}
-                      onChange={handleInputChange}
-                      className="border-zinc-700 bg-zinc-800 text-zinc-100"
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label htmlFor="date" className="text-sm font-medium text-zinc-400">
-                      Date
-                    </label>
-                    <Input
-                      id="date"
-                      name="date"
-                      type="date"
-                      value={editedReceipt.date}
-                      onChange={handleInputChange}
-                      className="border-zinc-700 bg-zinc-800 text-zinc-100"
-                      required
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex justify-between">
-                    <h3 className="text-lg font-semibold text-zinc-100">{receipt.vendor}</h3>
-                    <span className="text-lg font-bold text-zinc-100">{formatCurrency(receipt.amount)}</span>
-                  </div>
-                  <div className="text-sm text-zinc-400">Purchase Date: {formatDate(receipt.date)}</div>
-                </>
-              )}
+              <div className="flex justify-between">
+                <h3 className="text-lg font-semibold text-zinc-100">{receipt.vendor}</h3>
+                <span className="text-lg font-bold text-zinc-100">{formatCurrency(receipt.amount)}</span>
+              </div>
+              <div className="text-sm text-zinc-400">Purchase Date: {formatDate(receipt.date)}</div>
             </div>
 
             {/* Status and Payment */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-zinc-400">Status</h3>
-                <Select
-                  value={receipt.status}
-                  onValueChange={(value) => handleStatusUpdate(value)}
-                  disabled={isSubmitting || isEditing}
-                >
-                  <SelectTrigger className={`w-full border ${getStatusBadgeClass(receipt.status)}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
-                    <SelectItem
-                      value="processing"
-                      className="bg-blue-900/30 text-blue-300 focus:bg-blue-900/50 focus:text-blue-100"
-                    >
-                      Processing
-                    </SelectItem>
-                    <SelectItem
-                      value="approved"
-                      className="bg-green-900/30 text-green-300 focus:bg-green-900/50 focus:text-green-100"
-                    >
-                      Approved
-                    </SelectItem>
-                    <SelectItem
-                      value="rejected"
-                      className="bg-red-900/30 text-red-300 focus:bg-red-900/50 focus:text-red-100"
-                    >
-                      Rejected
-                    </SelectItem>
-                    <SelectItem
-                      value="duplicate"
-                      className="bg-purple-900/30 text-purple-300 focus:bg-purple-900/50 focus:text-purple-100"
-                    >
-                      Duplicate
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="text-sm text-zinc-300">{receipt.status}</div>
               </div>
 
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-zinc-400">Payment</h3>
-                <Select
-                  value={receipt.paid ? "paid" : "pending"}
-                  onValueChange={(value) => handlePaymentUpdate(value === "paid")}
-                  disabled={isSubmitting || isEditing}
-                >
-                  <SelectTrigger className={`w-full border ${getPaymentBadgeClass(receipt.paid)}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
-                    <SelectItem
-                      value="paid"
-                      className="bg-green-900/30 text-green-300 focus:bg-green-900/50 focus:text-green-100"
-                    >
-                      Paid
-                    </SelectItem>
-                    <SelectItem
-                      value="pending"
-                      className="bg-zinc-700/50 text-zinc-300 focus:bg-zinc-700/70 focus:text-zinc-100"
-                    >
-                      Pending
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="text-sm text-zinc-300">{receipt.paid ? "Paid" : "Pending"}</div>
               </div>
             </div>
 
