@@ -13,16 +13,40 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
-export function formatDate(dateString: string): string {
-  const date = new Date(dateString)
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(date)
+export function formatDate(dateString: string | null | undefined): string {
+  if (!dateString) return "N/A"
+
+  try {
+    const date = new Date(dateString)
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return "Invalid date"
+    }
+
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }).format(date)
+  } catch (error) {
+    console.error("Error formatting date:", error)
+    return "Invalid date"
+  }
 }
 
 export function formatDistanceToNow(date: Date | string): string {
-  const parsedDate = typeof date === "string" ? new Date(date) : date
-  return distanceToNow(parsedDate, { addSuffix: true })
+  try {
+    const parsedDate = typeof date === "string" ? new Date(date) : date
+
+    // Check if date is valid
+    if (isNaN(parsedDate.getTime())) {
+      return "Invalid date"
+    }
+
+    return distanceToNow(parsedDate, { addSuffix: true })
+  } catch (error) {
+    console.error("Error formatting distance to now:", error)
+    return "Invalid date"
+  }
 }
