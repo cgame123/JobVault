@@ -1,6 +1,7 @@
 import { groq } from "@ai-sdk/groq"
 import { generateText } from "ai"
 import { getMediaContent } from "./twilio-client"
+import { createWorker } from "tesseract.js"
 
 export async function processReceiptImage(
   imageUrl: string,
@@ -11,32 +12,39 @@ export async function processReceiptImage(
   date: string
 }> {
   try {
-    console.log("Starting AI receipt processing for image:", imageUrl)
+    console.log("Starting OCR-based receipt processing for image:", imageUrl)
 
     // Download the image content
     const imageBuffer = await getMediaContent(imageUrl)
 
-    // Convert image to base64 for the prompt
-    const base64Image = imageBuffer.toString("base64")
+    // Step 1: Extract text from the image using OCR
+    console.log("Starting OCR text extraction...")
+    const worker = await createWorker()
+    const { data } = await worker.recognize(imageBuffer)
+    await worker.terminate()
 
-    // Create a prompt for the AI to extract receipt information
+    const extractedText = data.text
+    console.log("OCR extracted text:", extractedText)
+
+    // Step 2: Use Groq to analyze the extracted text
     const prompt = `
-    You are a receipt information extractor. Analyze the following receipt image and extract these key details:
+    You are a receipt information extractor. Analyze the following receipt text and extract these key details:
     1. Vendor/Store Name
     2. Total Amount (just the number)
     3. Date (in YYYY-MM-DD format)
     
     If you cannot determine any field with certainty, use these defaults:
-    - Vendor: "Unknown Vendor"
+    - Vendor: "${messageText || "Unknown Vendor"}"
     - Amount: 0
     - Date: ${new Date().toISOString().split("T")[0]} (today's date)
     
     Format your response as a JSON object with these exact keys: vendor, amount, date
     
-    Receipt Image (base64): ${base64Image}
+    Receipt Text:
+    ${extractedText}
     `
 
-    // Use Groq to analyze the receipt
+    // Use Groq to analyze the receipt text
     const { text } = await generateText({
       model: groq("llama-3.1-8b-instant"),
       prompt: prompt,
@@ -58,7 +66,7 @@ export async function processReceiptImage(
     } catch (parseError) {
       console.error("Error parsing AI response:", parseError)
       // Fallback to basic extraction
-      result = extractBasicReceiptInfo(text, messageText)
+      result = extractBasicReceiptInfo(extractedText, messageText)
     }
 
     // Ensure we have all required fields with proper types
@@ -92,7 +100,7 @@ export async function processReceiptImage(
       date,
     }
   } catch (error) {
-    console.error("Error in AI receipt processing:", error)
+    console.error("Error in OCR receipt processing:", error)
 
     // Return fallback data
     return {
@@ -105,17 +113,42 @@ export async function processReceiptImage(
 
 // Fallback function to extract basic info without AI
 function extractBasicReceiptInfo(
-  aiText: string,
+  ocrText: string,
   messageText?: string,
 ): { vendor: string; amount: number; date: string } {
-  // Try to extract information from the AI text even if JSON parsing failed
-  const vendorMatch = aiText.match(/vendor[:\s]+([^\n,]+)/i)
-  const amountMatch = aiText.match(/amount[:\s]+([\d.]+)/i)
-  const dateMatch = aiText.match(/date[:\s]+(\d{4}-\d{2}-\d{2})/i)
+  // Try to extract information from the OCR text
+
+  // Look for vendor name in the first few lines
+  const lines = ocrText.split("\n").filter((line) => line.trim() !== "")
+  const potentialVendor = lines.length > 0 ? lines[0].trim() : messageText || "Unknown Vendor"
+
+  // Look for total amount
+  const totalRegex = /(?:total|amount|sum)(?:\s*:)?\s*[$]?(\d+\.\d{2})/i
+  const amountMatch = ocrText.match(totalRegex)
+  const amount = amountMatch ? Number.parseFloat(amountMatch[1]) : 0
+
+  // Look for date
+  const dateRegex = /(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/
+  const dateMatch = ocrText.match(dateRegex)
+  let date = new Date().toISOString().split("T")[0] // Default to today
+
+  if (dateMatch) {
+    const month = Number.parseInt(dateMatch[1], 10)
+    const day = Number.parseInt(dateMatch[2], 10)
+    let year = Number.parseInt(dateMatch[3], 10)
+
+    // Handle 2-digit years
+    if (year < 100) {
+      year += year < 50 ? 2000 : 1900
+    }
+
+    // Create date in YYYY-MM-DD format
+    date = `${year}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`
+  }
 
   return {
-    vendor: vendorMatch ? vendorMatch[1].trim() : messageText || "Unknown Vendor",
-    amount: amountMatch ? Number.parseFloat(amountMatch[1]) : 0,
-    date: dateMatch ? dateMatch[1] : new Date().toISOString().split("T")[0],
+    vendor: potentialVendor,
+    amount,
+    date,
   }
 }
