@@ -32,6 +32,7 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
   const currentProperty = searchParams.get("property") || ""
   const currentStaff = searchParams.get("staff") || ""
   const currentStatus = searchParams.get("status") || ""
+  const currentPaymentStatus = searchParams.get("payment") || ""
   const currentDateFrom = searchParams.get("dateFrom") || ""
   const currentDateTo = searchParams.get("dateTo") || ""
   const currentSort = searchParams.get("sort") || "date-desc"
@@ -85,9 +86,14 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
   }, [dateFrom, dateTo])
 
   // Count active filters
-  const activeFilterCount = [currentProperty, currentStaff, currentStatus, currentDateFrom, currentDateTo].filter(
-    Boolean,
-  ).length
+  const activeFilterCount = [
+    currentProperty,
+    currentStaff,
+    currentStatus,
+    currentPaymentStatus,
+    currentDateFrom,
+    currentDateTo,
+  ].filter(Boolean).length
 
   // Get status badge class based on status
   const getStatusBadgeClass = (status: string) => {
@@ -103,6 +109,11 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
       default:
         return "bg-blue-900/30 text-blue-300 border-blue-800" // Default to processing
     }
+  }
+
+  // Get payment status badge class
+  const getPaymentBadgeClass = (paid: boolean) => {
+    return paid ? "bg-green-900/30 text-green-300 border-green-800" : "bg-zinc-800/80 text-zinc-300 border-zinc-700"
   }
 
   return (
@@ -235,6 +246,51 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
               onClick={() => applyFilters({ status: "duplicate" })}
             >
               Duplicate
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Payment Status Filter */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700"
+          >
+            <Filter className="mr-2 h-3.5 w-3.5" />
+            Payment
+            {currentPaymentStatus && (
+              <span
+                className={`ml-1 rounded-full px-1.5 py-0.5 text-xs ${getPaymentBadgeClass(currentPaymentStatus === "paid")}`}
+              >
+                {currentPaymentStatus === "paid" ? "Paid" : "Pending"}
+              </span>
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56 border-zinc-800 bg-zinc-900 text-zinc-100">
+          <DropdownMenuLabel>Filter by Payment Status</DropdownMenuLabel>
+          <DropdownMenuSeparator className="bg-zinc-800" />
+          <DropdownMenuGroup>
+            <DropdownMenuItem
+              className={cn(
+                "cursor-pointer bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100",
+                currentPaymentStatus === "pending" && "font-medium",
+              )}
+              onClick={() => applyFilters({ payment: "pending" })}
+            >
+              Pending
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className={cn(
+                "cursor-pointer bg-green-900/30 text-green-300 hover:bg-green-900/50 hover:text-green-100",
+                currentPaymentStatus === "paid" && "font-medium",
+              )}
+              onClick={() => applyFilters({ payment: "paid" })}
+            >
+              Paid
             </DropdownMenuItem>
           </DropdownMenuGroup>
         </DropdownMenuContent>

@@ -61,11 +61,11 @@ export function PaymentBadge({ paid = false, className }: PaymentBadgeProps) {
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-        paid ? "bg-green-900/30 text-green-300" : "bg-red-900/30 text-red-300",
+        paid ? "bg-green-900/30 text-green-300" : "bg-zinc-700/50 text-zinc-300",
         className,
       )}
     >
-      {paid ? "Yes" : "No"}
+      {paid ? "Paid" : "Pending"}
     </span>
   )
 }

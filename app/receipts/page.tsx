@@ -39,83 +39,117 @@ async function getReceipts(searchParams: {
   property?: string
   staff?: string
   status?: string
+  payment?: string
   dateFrom?: string
   dateTo?: string
   sort?: string
 }): Promise<Receipt[]> {
-  // Start with the base query
-  let query = supabase.from("receipts").select(`
-      *,
+  try {
+    // Start with the base query
+    let query = supabase.from("receipts").select(`
+      id,
+      vendor,
+      amount,
+      date,
+      phone_number,
+      staff_id,
+      staff_name,
+      image_url,
+      created_at,
+      status,
+      paid,
       staff:staff_id (
+        id,
         name,
         property
       )
     `)
 
-  // Apply property filter if provided
-  if (searchParams.property) {
-    query = query.eq("staff.property", searchParams.property)
-  }
+    // Apply property filter if provided
+    if (searchParams.property) {
+      // First get staff IDs for this property
+      const { data: staffData } = await supabase.from("staff").select("id").eq("property", searchParams.property)
 
-  // Apply staff filter if provided
-  if (searchParams.staff) {
-    query = query.eq("staff_id", searchParams.staff)
-  }
+      if (staffData && staffData.length > 0) {
+        const staffIds = staffData.map((staff) => staff.id)
+        query = query.in("staff_id", staffIds)
+      } else {
+        return [] // No staff for this property, return empty
+      }
+    }
 
-  // Apply status filter if provided
-  if (searchParams.status) {
-    query = query.eq("status", searchParams.status)
-  }
+    // Apply staff filter if provided
+    if (searchParams.staff) {
+      query = query.eq("staff_id", searchParams.staff)
+    }
 
-  // Apply date range filters if provided
-  if (searchParams.dateFrom) {
-    query = query.gte("date", searchParams.dateFrom)
-  }
+    // Apply status filter if provided - FIXED
+    if (searchParams.status) {
+      // Direct equality check for status
+      query = query.eq("status", searchParams.status)
+    }
 
-  if (searchParams.dateTo) {
-    query = query.lte("date", searchParams.dateTo)
-  }
+    // Apply payment status filter if provided
+    if (searchParams.payment === "paid") {
+      query = query.eq("paid", true)
+    } else if (searchParams.payment === "pending") {
+      query = query.eq("paid", false)
+    }
 
-  // Apply sorting
-  const sort = searchParams.sort || "date-desc"
-  const [field, direction] = sort.split("-")
+    // Apply date range filters if provided
+    if (searchParams.dateFrom) {
+      query = query.gte("date", searchParams.dateFrom)
+    }
 
-  switch (field) {
-    case "date":
-      query = query.order("date", { ascending: direction === "asc" })
-      break
-    case "amount":
-      query = query.order("amount", { ascending: direction === "asc" })
-      break
-    case "vendor":
-      query = query.order("vendor", { ascending: direction === "asc" })
-      break
-    default:
-      query = query.order("created_at", { ascending: false })
-  }
+    if (searchParams.dateTo) {
+      query = query.lte("date", searchParams.dateTo)
+    }
 
-  // Execute the query
-  const { data, error } = await query
+    // Apply sorting
+    const sort = searchParams.sort || "date-desc"
+    const [field, direction] = sort.split("-")
 
-  if (error) {
-    console.error("Error fetching receipts:", error)
+    switch (field) {
+      case "date":
+        query = query.order("date", { ascending: direction === "asc" })
+        break
+      case "amount":
+        query = query.order("amount", { ascending: direction === "asc" })
+        break
+      case "vendor":
+        query = query.order("vendor", { ascending: direction === "asc" })
+        break
+      default:
+        query = query.order("created_at", { ascending: false })
+    }
+
+    // Execute the query
+    const { data, error } = await query
+
+    if (error) {
+      console.error("Error fetching receipts:", error)
+      return []
+    }
+
+    // Map the results to our Receipt type
+    return data.map((row) => ({
+      id: row.id,
+      vendor: row.vendor,
+      amount: Number(row.amount),
+      date: row.date,
+      phoneNumber: row.phone_number,
+      staffId: row.staff_id,
+      staffName: row.staff_name || (row.staff ? row.staff.name : null),
+      property: row.staff ? row.staff.property : null,
+      imageUrl: row.image_url,
+      createdAt: row.created_at,
+      status: row.status || "processing", // Default to processing if null
+      paid: row.paid || false, // Default to false if null
+    }))
+  } catch (error) {
+    console.error("Error in getReceipts:", error)
     return []
   }
-
-  return data.map((row) => ({
-    id: row.id,
-    vendor: row.vendor,
-    amount: Number(row.amount),
-    date: row.date,
-    phoneNumber: row.phone_number,
-    staffId: row.staff_id,
-    staffName: row.staff_name || (row.staff ? row.staff.name : null),
-    property: row.staff ? row.staff.property : null,
-    imageUrl: row.image_url,
-    createdAt: row.created_at,
-    status: row.status || "processing",
-    paid: row.paid || false,
-  }))
 }
 
 export default async function ReceiptsPage({
@@ -125,6 +159,7 @@ export default async function ReceiptsPage({
     property?: string
     staff?: string
     status?: string
+    payment?: string
     dateFrom?: string
     dateTo?: string
     sort?: string
@@ -154,6 +189,9 @@ export default async function ReceiptsPage({
       </div>
 
       <div className="mt-4">
+        <p className="text-sm text-zinc-400 mb-2">
+          Showing {receipts.length} receipt{receipts.length !== 1 ? "s" : ""}
+        </p>
         <ReceiptTable receipts={receipts} />
       </div>
     </div>

@@ -91,7 +91,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
 
   // Get payment badge class based on paid status
   const getPaymentBadgeClass = (paid: boolean) => {
-    return paid ? "bg-green-900/30 text-green-300 border-green-800" : "bg-red-900/30 text-red-300 border-red-800"
+    return paid ? "bg-green-900/30 text-green-300 border-green-800" : "bg-zinc-700/50 text-zinc-300 border-zinc-600"
   }
 
   // Handle status update
@@ -495,9 +495,9 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
                     </SelectItem>
                     <SelectItem
                       value="unpaid"
-                      className="bg-red-900/30 text-red-300 focus:bg-red-900/50 focus:text-red-100"
+                      className="bg-zinc-700/50 text-zinc-300 focus:bg-zinc-700/70 focus:text-zinc-100"
                     >
-                      Unpaid
+                      Pending
                     </SelectItem>
                   </SelectContent>
                 </Select>
