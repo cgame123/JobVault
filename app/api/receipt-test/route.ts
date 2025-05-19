@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { groq } from "@ai-sdk/groq"
 import { generateText } from "ai"
 import { getMediaContent } from "@/lib/twilio-client"
+import sharp from "sharp"
 
 // Sample receipt URLs from your project
 const SAMPLE_RECEIPTS = {
@@ -38,8 +39,16 @@ export async function GET(req: Request) {
       const imageBuffer = await getMediaContent(imageUrl)
       console.log("Successfully downloaded image, size:", imageBuffer.length, "bytes")
 
+      // Resize the image to reduce size (lower resolution = fewer tokens)
+      const resizedImageBuffer = await sharp(imageBuffer)
+        .resize(400) // Resize to 400px width (maintaining aspect ratio)
+        .jpeg({ quality: 50 }) // Convert to JPEG with 50% quality
+        .toBuffer()
+
+      console.log("Resized image size:", resizedImageBuffer.length, "bytes")
+
       // Convert image to base64 for the prompt
-      const base64Image = imageBuffer.toString("base64")
+      const base64Image = resizedImageBuffer.toString("base64")
 
       // Create a prompt for the AI to extract receipt information
       const prompt = `
