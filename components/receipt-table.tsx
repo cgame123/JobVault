@@ -7,11 +7,10 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Eye, Download, ExternalLink, Trash, Check, X, RefreshCw } from "lucide-react"
+import { Eye, Download, ExternalLink, Trash } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
-import { StatusBadge, PaymentBadge } from "@/components/status-badge"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface ReceiptTableProps {
   receipts: Receipt[]
@@ -195,53 +194,6 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
     }
   }
 
-  // Get status action buttons based on current status
-  const getStatusActions = (receipt: Receipt) => {
-    const currentStatus = receipt.status || "submitted"
-
-    if (currentStatus === "submitted") {
-      return (
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-green-800 bg-green-900/20 text-green-300 hover:bg-green-900/30 hover:text-green-200"
-            onClick={() => handleStatusUpdate(receipt.id, "approved")}
-            disabled={isSubmitting}
-          >
-            <Check className="mr-1 h-3 w-3" />
-            Approve
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-red-800 bg-red-900/20 text-red-300 hover:bg-red-900/30 hover:text-red-200"
-            onClick={() => handleStatusUpdate(receipt.id, "rejected")}
-            disabled={isSubmitting}
-          >
-            <X className="mr-1 h-3 w-3" />
-            Reject
-          </Button>
-        </div>
-      )
-    }
-
-    return (
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="border-zinc-700 bg-zinc-800/50 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100"
-          onClick={() => handleStatusUpdate(receipt.id, "submitted")}
-          disabled={isSubmitting}
-        >
-          <RefreshCw className="mr-1 h-3 w-3" />
-          Reset
-        </Button>
-      </div>
-    )
-  }
-
   return (
     <>
       <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50 shadow-lg">
@@ -293,30 +245,78 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
                   <TableCell className="text-zinc-100">{receipt.staffName || "Unknown"}</TableCell>
                   <TableCell className="text-zinc-100">{receipt.property || "—"}</TableCell>
                   <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <StatusBadge status={receipt.status} />
-                      {getStatusActions(receipt)}
-                    </div>
+                    <Select
+                      defaultValue={receipt.status || "submitted"}
+                      onValueChange={(value) => handleStatusUpdate(receipt.id, value)}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger className="w-[130px] border-zinc-700 bg-zinc-800 text-zinc-100">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
+                        <SelectItem value="submitted">
+                          <div className="flex items-center">
+                            <div className="mr-2 h-2 w-2 rounded-full bg-zinc-400"></div>
+                            Submitted
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="processing">
+                          <div className="flex items-center">
+                            <div className="mr-2 h-2 w-2 rounded-full bg-blue-400"></div>
+                            Processing
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="needs_review">
+                          <div className="flex items-center">
+                            <div className="mr-2 h-2 w-2 rounded-full bg-amber-400"></div>
+                            Needs Review
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="approved">
+                          <div className="flex items-center">
+                            <div className="mr-2 h-2 w-2 rounded-full bg-green-400"></div>
+                            Approved
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="rejected">
+                          <div className="flex items-center">
+                            <div className="mr-2 h-2 w-2 rounded-full bg-red-400"></div>
+                            Rejected
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="duplicate">
+                          <div className="flex items-center">
+                            <div className="mr-2 h-2 w-2 rounded-full bg-purple-400"></div>
+                            Duplicate
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2"
-                            onClick={() => handlePaymentUpdate(receipt.id, !receipt.paid)}
-                            disabled={isSubmitting}
-                          >
-                            <PaymentBadge paid={receipt.paid} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>Click to toggle payment status</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Select
+                      defaultValue={receipt.paid ? "paid" : "unpaid"}
+                      onValueChange={(value) => handlePaymentUpdate(receipt.id, value === "paid")}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger className="w-[100px] border-zinc-700 bg-zinc-800 text-zinc-100">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
+                        <SelectItem value="paid">
+                          <div className="flex items-center">
+                            <div className="mr-2 h-2 w-2 rounded-full bg-green-400"></div>
+                            Paid
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="unpaid">
+                          <div className="flex items-center">
+                            <div className="mr-2 h-2 w-2 rounded-full bg-red-400"></div>
+                            Unpaid
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
@@ -389,28 +389,80 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
                   <p className="text-sm font-medium text-zinc-500">Status</p>
-                  <div className="flex flex-col gap-2">
-                    <StatusBadge status={selectedReceipt.status} className="w-fit" />
-                    {getStatusActions(selectedReceipt)}
-                  </div>
+                  <Select
+                    value={selectedReceipt.status || "submitted"}
+                    onValueChange={(value) => handleStatusUpdate(selectedReceipt.id, value)}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger className="w-full border-zinc-700 bg-zinc-800 text-zinc-100">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
+                      <SelectItem value="submitted">
+                        <div className="flex items-center">
+                          <div className="mr-2 h-2 w-2 rounded-full bg-zinc-400"></div>
+                          Submitted
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="processing">
+                        <div className="flex items-center">
+                          <div className="mr-2 h-2 w-2 rounded-full bg-blue-400"></div>
+                          Processing
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="needs_review">
+                        <div className="flex items-center">
+                          <div className="mr-2 h-2 w-2 rounded-full bg-amber-400"></div>
+                          Needs Review
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="approved">
+                        <div className="flex items-center">
+                          <div className="mr-2 h-2 w-2 rounded-full bg-green-400"></div>
+                          Approved
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="rejected">
+                        <div className="flex items-center">
+                          <div className="mr-2 h-2 w-2 rounded-full bg-red-400"></div>
+                          Rejected
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="duplicate">
+                        <div className="flex items-center">
+                          <div className="mr-2 h-2 w-2 rounded-full bg-purple-400"></div>
+                          Duplicate
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex flex-col gap-2">
                   <p className="text-sm font-medium text-zinc-500">Payment</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePaymentUpdate(selectedReceipt.id, !selectedReceipt.paid)}
-                    className="flex w-fit items-center gap-2"
+                  <Select
+                    value={selectedReceipt.paid ? "paid" : "unpaid"}
+                    onValueChange={(value) => handlePaymentUpdate(selectedReceipt.id, value === "paid")}
                     disabled={isSubmitting}
                   >
-                    {selectedReceipt.paid ? (
-                      <Check className="h-4 w-4 text-green-400" />
-                    ) : (
-                      <X className="h-4 w-4 text-red-400" />
-                    )}
-                    <PaymentBadge paid={selectedReceipt.paid} />
-                  </Button>
+                    <SelectTrigger className="w-full border-zinc-700 bg-zinc-800 text-zinc-100">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
+                      <SelectItem value="paid">
+                        <div className="flex items-center">
+                          <div className="mr-2 h-2 w-2 rounded-full bg-green-400"></div>
+                          Paid
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="unpaid">
+                        <div className="flex items-center">
+                          <div className="mr-2 h-2 w-2 rounded-full bg-red-400"></div>
+                          Unpaid
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
