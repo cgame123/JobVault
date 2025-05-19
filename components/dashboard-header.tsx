@@ -7,8 +7,8 @@ export function DashboardHeader() {
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-100">JobVault</h1>
-        <p className="text-zinc-400">Track and manage receipts sent via SMS</p>
+        <h1 className="text-3xl font-bold tracking-tight text-zinc-100">Dashboard</h1>
+        <p className="text-zinc-400">Every charge. Every property. Accounted for.</p>
       </div>
       <div className="flex items-center gap-3">
         <div className="relative">

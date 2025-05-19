@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
   title: "JobVault",
-  description: "Track and manage receipts sent via SMS",
+  description: "Every charge. Every property. Accounted for.",
     generator: 'v0.dev'
 }
 
