@@ -9,6 +9,8 @@ export interface Receipt {
   property?: string // This comes from the staff table, not stored in receipts
   imageUrl: string
   createdAt: string
+  status: "submitted" | "processing" | "needs_review" | "approved" | "rejected" | "duplicate"
+  paid: boolean
 }
 
 export interface StaffMember {

@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { formatDistanceToNow as distanceToNow } from "date-fns"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -19,4 +20,9 @@ export function formatDate(dateString: string): string {
     month: "short",
     day: "numeric",
   }).format(date)
+}
+
+export function formatDistanceToNow(date: Date | string): string {
+  const parsedDate = typeof date === "string" ? new Date(date) : date
+  return distanceToNow(parsedDate, { addSuffix: true })
 }

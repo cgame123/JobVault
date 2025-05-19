@@ -7,16 +7,24 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Eye, Download, ExternalLink, Trash } from "lucide-react"
+import { Eye, Download, ExternalLink, Trash, Check, X, RefreshCw } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
+import { StatusBadge, PaymentBadge } from "@/components/status-badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface ReceiptTableProps {
   receipts: Receipt[]
 }
 
 export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
-  const [receipts, setReceipts] = useState<Receipt[]>(initialReceipts)
+  const [receipts, setReceipts] = useState<Receipt[]>(
+    initialReceipts.map((receipt) => ({
+      ...receipt,
+      status: receipt.status || "submitted", // Provide default status
+      paid: receipt.paid || false, // Provide default paid status
+    })),
+  )
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
   const [imageLoading, setImageLoading] = useState(false)
   const [imageError, setImageError] = useState(false)
@@ -95,6 +103,145 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
     }
   }
 
+  // Handle status update
+  const handleStatusUpdate = async (receiptId: string, status: string) => {
+    setIsSubmitting(true)
+
+    try {
+      // Try the direct update endpoint
+      const response = await fetch(`/api/receipts/${receiptId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update receipt status")
+      }
+
+      // Update the local state
+      setReceipts((prev) =>
+        prev.map((receipt) => (receipt.id === receiptId ? { ...receipt, status: status as any } : receipt)),
+      )
+
+      // If the selected receipt is the one being updated, update it too
+      if (selectedReceipt && selectedReceipt.id === receiptId) {
+        setSelectedReceipt({ ...selectedReceipt, status: status as any })
+      }
+
+      // Show success message
+      toast({
+        title: "Status updated",
+        description: `Receipt status has been updated to ${status}.`,
+      })
+    } catch (error) {
+      console.error("Error updating receipt status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update receipt status. Try refreshing the Supabase schema.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle payment update
+  const handlePaymentUpdate = async (receiptId: string, paid: boolean) => {
+    setIsSubmitting(true)
+
+    try {
+      // Try the direct update endpoint
+      const response = await fetch(`/api/receipts/${receiptId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ paid }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update payment status")
+      }
+
+      // Update the local state
+      setReceipts((prev) => prev.map((receipt) => (receipt.id === receiptId ? { ...receipt, paid } : receipt)))
+
+      // If the selected receipt is the one being updated, update it too
+      if (selectedReceipt && selectedReceipt.id === receiptId) {
+        setSelectedReceipt({ ...selectedReceipt, paid })
+      }
+
+      // Show success message
+      toast({
+        title: "Payment status updated",
+        description: `Receipt has been marked as ${paid ? "paid" : "unpaid"}.`,
+      })
+    } catch (error) {
+      console.error("Error updating payment status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update payment status. Try refreshing the Supabase schema.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Get status action buttons based on current status
+  const getStatusActions = (receipt: Receipt) => {
+    const currentStatus = receipt.status || "submitted"
+
+    if (currentStatus === "submitted") {
+      return (
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-green-800 bg-green-900/20 text-green-300 hover:bg-green-900/30 hover:text-green-200"
+            onClick={() => handleStatusUpdate(receipt.id, "approved")}
+            disabled={isSubmitting}
+          >
+            <Check className="mr-1 h-3 w-3" />
+            Approve
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-red-800 bg-red-900/20 text-red-300 hover:bg-red-900/30 hover:text-red-200"
+            onClick={() => handleStatusUpdate(receipt.id, "rejected")}
+            disabled={isSubmitting}
+          >
+            <X className="mr-1 h-3 w-3" />
+            Reject
+          </Button>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-zinc-700 bg-zinc-800/50 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100"
+          onClick={() => handleStatusUpdate(receipt.id, "submitted")}
+          disabled={isSubmitting}
+        >
+          <RefreshCw className="mr-1 h-3 w-3" />
+          Reset
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50 shadow-lg">
@@ -107,13 +254,15 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
               <TableHead className="text-zinc-400">Date</TableHead>
               <TableHead className="text-zinc-400">Staff Member</TableHead>
               <TableHead className="text-zinc-400">Property</TableHead>
+              <TableHead className="text-zinc-400">Status</TableHead>
+              <TableHead className="text-zinc-400">Payment</TableHead>
               <TableHead className="text-right text-zinc-400">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {receipts.length === 0 ? (
               <TableRow className="border-zinc-800 hover:bg-zinc-800/50">
-                <TableCell colSpan={7} className="h-24 text-center text-zinc-400">
+                <TableCell colSpan={9} className="h-24 text-center text-zinc-400">
                   No receipts found.
                 </TableCell>
               </TableRow>
@@ -143,11 +292,37 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
                   <TableCell className="text-zinc-100">{formatDate(receipt.date)}</TableCell>
                   <TableCell className="text-zinc-100">{receipt.staffName || "Unknown"}</TableCell>
                   <TableCell className="text-zinc-100">{receipt.property || "—"}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <StatusBadge status={receipt.status} />
+                      {getStatusActions(receipt)}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2"
+                            onClick={() => handlePaymentUpdate(receipt.id, !receipt.paid)}
+                            disabled={isSubmitting}
+                          >
+                            <PaymentBadge paid={receipt.paid} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p>Click to toggle payment status</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setSelectedReceipt(receipt)}
+                      onClick={() => (window.location.href = `/receipts/${receipt.id}`)}
                       className="text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
                     >
                       <Eye className="h-4 w-4" />
@@ -207,6 +382,35 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
                       <p className="text-center text-zinc-400">Failed to load image</p>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Status and payment badges */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-medium text-zinc-500">Status</p>
+                  <div className="flex flex-col gap-2">
+                    <StatusBadge status={selectedReceipt.status} className="w-fit" />
+                    {getStatusActions(selectedReceipt)}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-medium text-zinc-500">Payment</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePaymentUpdate(selectedReceipt.id, !selectedReceipt.paid)}
+                    className="flex w-fit items-center gap-2"
+                    disabled={isSubmitting}
+                  >
+                    {selectedReceipt.paid ? (
+                      <Check className="h-4 w-4 text-green-400" />
+                    ) : (
+                      <X className="h-4 w-4 text-red-400" />
+                    )}
+                    <PaymentBadge paid={selectedReceipt.paid} />
+                  </Button>
                 </div>
               </div>
 
