@@ -85,27 +85,55 @@ async function getReceipts(searchParams: {
       query = query.eq("staff_id", searchParams.staff)
     }
 
-    // Apply status filter if provided - UPDATED to use explicit approach
+    // Apply status filter if provided - UPDATED for better cross-environment compatibility
     if (searchParams.status) {
-      // Explicitly check for each status value
+      // Use a more direct approach that works consistently across environments
       if (searchParams.status === "processing") {
-        // For processing, include both explicit "processing" and null values
-        query = query.or("status.eq.processing,status.is.null")
-      } else if (searchParams.status === "approved") {
-        query = query.eq("status", "approved")
-      } else if (searchParams.status === "rejected") {
-        query = query.eq("status", "rejected")
-      } else if (searchParams.status === "duplicate") {
-        query = query.eq("status", "duplicate")
+        // First get all receipts with explicit "processing" status
+        const processingQuery = supabase.from("receipts").select("id").eq("status", "processing")
+
+        // Then get all receipts with null status
+        const nullStatusQuery = supabase.from("receipts").select("id").is("status", null)
+
+        // Execute both queries
+        const [processingResult, nullStatusResult] = await Promise.all([processingQuery, nullStatusQuery])
+
+        // Combine the IDs
+        const processingIds = processingResult.data?.map((r) => r.id) || []
+        const nullStatusIds = nullStatusResult.data?.map((r) => r.id) || []
+        const combinedIds = [...processingIds, ...nullStatusIds]
+
+        if (combinedIds.length > 0) {
+          query = query.in("id", combinedIds)
+        } else {
+          return [] // No matching receipts
+        }
+      } else {
+        // For other statuses, use simple equality
+        query = query.eq("status", searchParams.status)
       }
     }
 
-    // Apply payment status filter if provided
+    // Apply payment status filter if provided - UPDATED for better cross-environment compatibility
     if (searchParams.payment === "paid") {
       query = query.eq("paid", true)
     } else if (searchParams.payment === "pending") {
-      // For pending, include both explicit false and null values
-      query = query.or("paid.eq.false,paid.is.null")
+      // Use the same approach as for status
+      const unpaidQuery = supabase.from("receipts").select("id").eq("paid", false)
+
+      const nullPaidQuery = supabase.from("receipts").select("id").is("paid", null)
+
+      const [unpaidResult, nullPaidResult] = await Promise.all([unpaidQuery, nullPaidQuery])
+
+      const unpaidIds = unpaidResult.data?.map((r) => r.id) || []
+      const nullPaidIds = nullPaidResult.data?.map((r) => r.id) || []
+      const combinedIds = [...unpaidIds, ...nullPaidIds]
+
+      if (combinedIds.length > 0) {
+        query = query.in("id", combinedIds)
+      } else {
+        return [] // No matching receipts
+      }
     }
 
     // Apply date range filters if provided
@@ -143,10 +171,10 @@ async function getReceipts(searchParams: {
       return []
     }
 
-    console.log("Query results:", data) // Debug log
+    console.log(`Query returned ${data?.length || 0} receipts`) // Debug log
 
     // Map the results to our Receipt type
-    return data.map((row) => ({
+    return (data || []).map((row) => ({
       id: row.id,
       vendor: row.vendor,
       amount: Number(row.amount),
