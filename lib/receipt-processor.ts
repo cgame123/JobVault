@@ -1,4 +1,4 @@
-import { processReceiptWithMindee } from "./mindee-client"
+import { processReceiptWithAPI } from "./receipt-api"
 
 export async function processReceiptImage(
   imageUrl: string,
@@ -9,12 +9,12 @@ export async function processReceiptImage(
   date: string
 }> {
   try {
-    console.log("Starting receipt processing with Mindee for image:", imageUrl)
+    console.log("Starting receipt processing with API for image:", imageUrl)
 
-    // Process the receipt with Mindee
-    const receiptData = await processReceiptWithMindee(imageUrl)
+    // Process the receipt with the API
+    const receiptData = await processReceiptWithAPI(imageUrl)
 
-    // If Mindee couldn't determine the vendor but we have message text, use that
+    // If API couldn't determine the vendor but we have message text, use that
     if (receiptData.vendor === "Unknown Vendor" && messageText && messageText.trim() !== "") {
       receiptData.vendor = messageText.trim()
     }
