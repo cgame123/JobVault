@@ -2,7 +2,6 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getMediaContent } from "@/lib/twilio-client"
 import { supabase } from "@/lib/supabase"
 import { processReceiptImage } from "@/lib/receipt-processor"
-import { sendConfirmationSMS } from "@/lib/twilio-sender"
 import { v4 as uuidv4 } from "uuid"
 
 export async function POST(req: NextRequest) {
@@ -29,8 +28,7 @@ export async function POST(req: NextRequest) {
     if (!mediaUrl || numMedia === "0") {
       console.log("ℹ️ No image was provided in the message")
 
-      // Send a response asking for an image
-      await sendConfirmationSMS(from, "Please send a photo of your receipt along with your message.")
+      // No confirmation SMS is sent even in this case
 
       return NextResponse.json(
         {
@@ -68,7 +66,6 @@ export async function POST(req: NextRequest) {
       const receiptId = uuidv4()
 
       // Insert the receipt directly into Supabase
-      // Note: We're only storing staff_id, not property (which comes from staff)
       const { error: insertError } = await supabase.from("receipts").insert({
         id: receiptId,
         vendor: receiptData.vendor,
@@ -84,8 +81,7 @@ export async function POST(req: NextRequest) {
       if (insertError) {
         console.error("❌ Error inserting receipt into Supabase:", insertError)
 
-        // Send error notification
-        await sendConfirmationSMS(from, "There was an error processing your receipt. Please try again later.")
+        // No error confirmation SMS is sent
 
         return NextResponse.json(
           {
@@ -99,13 +95,7 @@ export async function POST(req: NextRequest) {
 
       console.log("💾 Receipt stored with ID:", receiptId)
 
-      // Send confirmation SMS
-      const staffName = staffData?.name ? ` ${staffData.name}` : ""
-      const propertyInfo = staffData?.property ? ` for ${staffData.property}` : ""
-
-      const confirmationMessage = `Thanks${staffName}! Your receipt${propertyInfo} has been received and stored. Receipt ID: ${receiptId.substring(0, 8)}`
-
-      await sendConfirmationSMS(from, confirmationMessage)
+      // No confirmation SMS is sent anymore
 
       // Return a success response
       return NextResponse.json(
@@ -124,11 +114,7 @@ export async function POST(req: NextRequest) {
     } catch (mediaError) {
       console.error("❌ Error handling media:", mediaError)
 
-      // Send error notification
-      await sendConfirmationSMS(
-        from,
-        "There was an error processing your receipt image. Please try again with a clearer photo.",
-      )
+      // No error confirmation SMS is sent
 
       return NextResponse.json(
         {
