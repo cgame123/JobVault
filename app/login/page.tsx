@@ -121,14 +121,7 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="text-center text-sm text-zinc-400">
-              <p>For demo purposes, you can use:</p>
-              <p className="mt-1">Email: demo@example.com</p>
-              <p>Password: demo123456</p>
-            </div>
-            <DynamicAuthUI />
-          </div>
+          <DynamicAuthUI />
         </CardContent>
       </Card>
     </div>
