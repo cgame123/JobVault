@@ -5,18 +5,26 @@ import Image from "next/image"
 import type { Receipt } from "@/lib/types"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Eye, Download, ExternalLink } from "lucide-react"
+import { Eye, Download, ExternalLink, Trash } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
+import { useRouter } from "next/navigation"
 
 interface ReceiptTableProps {
   receipts: Receipt[]
 }
 
-export function ReceiptTable({ receipts }: ReceiptTableProps) {
+export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
+  const [receipts, setReceipts] = useState<Receipt[]>(initialReceipts)
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
   const [imageLoading, setImageLoading] = useState(false)
   const [imageError, setImageError] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
+  const router = useRouter()
 
   // Function to create a proxy URL for Twilio images
   const getProxyImageUrl = (originalUrl: string, download = false) => {
@@ -31,6 +39,61 @@ export function ReceiptTable({ receipts }: ReceiptTableProps) {
       setImageError(false)
     }
   }, [selectedReceipt])
+
+  // Handle delete confirmation
+  const handleDeleteClick = (receipt: Receipt) => {
+    setReceiptToDelete(receipt)
+    setIsDeleting(true)
+  }
+
+  // Handle actual deletion
+  const handleDeleteConfirm = async () => {
+    if (!receiptToDelete) return
+
+    setIsSubmitting(true)
+
+    try {
+      // Submit the delete request to the API
+      const response = await fetch(`/api/receipts/${receiptToDelete.id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to delete receipt")
+      }
+
+      // Update the local state
+      setReceipts((prev) => prev.filter((receipt) => receipt.id !== receiptToDelete.id))
+
+      // Show success message
+      toast({
+        title: "Receipt deleted",
+        description: `Receipt from ${receiptToDelete.vendor} has been deleted successfully.`,
+      })
+
+      // Close dialog
+      setIsDeleting(false)
+      setReceiptToDelete(null)
+
+      // If the deleted receipt was being viewed, close that dialog too
+      if (selectedReceipt && selectedReceipt.id === receiptToDelete.id) {
+        setSelectedReceipt(null)
+      }
+
+      // Refresh the page to show the updated receipt list
+      router.refresh()
+    } catch (error) {
+      console.error("Error deleting receipt:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete receipt",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <>
@@ -90,6 +153,15 @@ export function ReceiptTable({ receipts }: ReceiptTableProps) {
                       <Eye className="h-4 w-4" />
                       <span className="sr-only">View receipt</span>
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteClick(receipt)}
+                      className="text-zinc-400 hover:bg-zinc-800 hover:text-red-400"
+                    >
+                      <Trash className="h-4 w-4" />
+                      <span className="sr-only">Delete receipt</span>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -98,6 +170,7 @@ export function ReceiptTable({ receipts }: ReceiptTableProps) {
         </Table>
       </div>
 
+      {/* Receipt Details Dialog */}
       <Dialog open={!!selectedReceipt} onOpenChange={(open) => !open && setSelectedReceipt(null)}>
         {selectedReceipt && (
           <DialogContent className="border-zinc-800 bg-zinc-900 text-zinc-100 sm:max-w-md">
@@ -147,14 +220,27 @@ export function ReceiptTable({ receipts }: ReceiptTableProps) {
                   <ExternalLink className="mr-2 h-4 w-4" />
                   View Full Size
                 </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => window.open(getProxyImageUrl(selectedReceipt.imageUrl, true), "_blank")}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => window.open(getProxyImageUrl(selectedReceipt.imageUrl, true), "_blank")}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedReceipt(null)
+                      handleDeleteClick(selectedReceipt)
+                    }}
+                  >
+                    <Trash className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -180,6 +266,37 @@ export function ReceiptTable({ receipts }: ReceiptTableProps) {
                 </div>
               </div>
             </div>
+          </DialogContent>
+        )}
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleting} onOpenChange={(open) => !open && setIsDeleting(false)}>
+        {receiptToDelete && (
+          <DialogContent className="border-zinc-800 bg-zinc-900 text-zinc-100 sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Delete Receipt</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-zinc-300">
+                Are you sure you want to delete this receipt from{" "}
+                <span className="font-semibold">{receiptToDelete.vendor}</span>? This action cannot be undone.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDeleting(false)}
+                className="border-zinc-700 bg-transparent text-zinc-100 hover:bg-zinc-800 hover:text-zinc-100"
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="button" variant="destructive" onClick={handleDeleteConfirm} disabled={isSubmitting}>
+                {isSubmitting ? "Deleting..." : "Delete"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         )}
       </Dialog>
