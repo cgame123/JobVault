@@ -64,11 +64,19 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
     router.push(`/receipts?${params.toString()}`)
   }
 
-  // Clear all filters
+  // Clear all filters - UPDATED
   const clearFilters = () => {
-    router.push("/receipts")
+    // Reset all filter states
     setDateFrom(undefined)
     setDateTo(undefined)
+
+    // Use the router to navigate to the base path without any query parameters
+    router.push("/receipts")
+
+    // Force a refresh to ensure the page updates
+    setTimeout(() => {
+      window.location.href = "/receipts"
+    }, 100)
   }
 
   // Apply date filter when dates change

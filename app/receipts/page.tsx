@@ -45,6 +45,8 @@ async function getReceipts(searchParams: {
   sort?: string
 }): Promise<Receipt[]> {
   try {
+    console.log("Search params:", searchParams) // Debug log
+
     // Build the base query
     let query = supabase.from("receipts").select(`
         id,
@@ -83,16 +85,27 @@ async function getReceipts(searchParams: {
       query = query.eq("staff_id", searchParams.staff)
     }
 
-    // Apply status filter if provided
+    // Apply status filter if provided - UPDATED to use explicit approach
     if (searchParams.status) {
-      query = query.eq("status", searchParams.status)
+      // Explicitly check for each status value
+      if (searchParams.status === "processing") {
+        // For processing, include both explicit "processing" and null values
+        query = query.or("status.eq.processing,status.is.null")
+      } else if (searchParams.status === "approved") {
+        query = query.eq("status", "approved")
+      } else if (searchParams.status === "rejected") {
+        query = query.eq("status", "rejected")
+      } else if (searchParams.status === "duplicate") {
+        query = query.eq("status", "duplicate")
+      }
     }
 
     // Apply payment status filter if provided
     if (searchParams.payment === "paid") {
       query = query.eq("paid", true)
     } else if (searchParams.payment === "pending") {
-      query = query.eq("paid", false)
+      // For pending, include both explicit false and null values
+      query = query.or("paid.eq.false,paid.is.null")
     }
 
     // Apply date range filters if provided
@@ -129,6 +142,8 @@ async function getReceipts(searchParams: {
       console.error("Error fetching receipts:", error)
       return []
     }
+
+    console.log("Query results:", data) // Debug log
 
     // Map the results to our Receipt type
     return data.map((row) => ({
