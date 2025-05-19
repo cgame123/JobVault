@@ -34,9 +34,10 @@ export function PropertyMetricsChart({ data, propertyDetails = {} }: PropertyMet
     // Clear any existing content
     chartRef.current.innerHTML = ""
 
-    // Get properties and values
-    const properties = Object.keys(data)
-    const values = Object.values(data)
+    // Get properties and values, then sort by value in descending order
+    const propertyEntries = Object.entries(data).sort((a, b) => b[1] - a[1])
+    const properties = propertyEntries.map(([property]) => property)
+    const values = propertyEntries.map(([, value]) => value)
     const total = values.reduce((sum, value) => sum + value, 0)
 
     // If no data, show a message
@@ -48,27 +49,78 @@ export function PropertyMetricsChart({ data, propertyDetails = {} }: PropertyMet
       return
     }
 
-    // Create a simple bar chart
+    // Log data for debugging
+    console.log("Chart data:", propertyEntries)
+
+    // Create a vertical column chart
     const chartContainer = document.createElement("div")
-    chartContainer.className = "flex h-full flex-col justify-end space-y-2"
+    chartContainer.className = "flex h-full flex-col"
 
     // Calculate the maximum value for scaling
     const maxValue = Math.max(...values)
+    console.log("Max value:", maxValue)
+
+    // Create chart area with y-axis and bars
+    const chartArea = document.createElement("div")
+    chartArea.className = "flex flex-1 mt-8 mb-4"
+    chartArea.style.height = "300px" // Explicit height
+
+    // Create y-axis
+    const yAxis = document.createElement("div")
+    yAxis.className = "flex flex-col justify-between pr-2 text-xs text-zinc-400"
+
+    // Add y-axis labels (5 steps)
+    const steps = 5
+    for (let i = steps; i >= 0; i--) {
+      const value = (maxValue * i) / steps
+      const label = document.createElement("div")
+      label.className = "text-right"
+      label.textContent = formatCurrency(value)
+      yAxis.appendChild(label)
+    }
+    chartArea.appendChild(yAxis)
+
+    // Create bars container with grid lines
+    const barsContainer = document.createElement("div")
+    barsContainer.className = "relative flex-1 flex items-end"
+
+    // Add horizontal grid lines
+    for (let i = 0; i <= steps; i++) {
+      const gridLine = document.createElement("div")
+      gridLine.className = "absolute w-full border-t border-zinc-800"
+      gridLine.style.bottom = `${(i / steps) * 100}%`
+      barsContainer.appendChild(gridLine)
+    }
+
+    // Create bars wrapper (horizontal flex)
+    const barsWrapper = document.createElement("div")
+    barsWrapper.className = "flex justify-between items-end w-full h-full"
 
     // Create bars for each property
-    properties.forEach((property, index) => {
-      const value = data[property]
+    propertyEntries.forEach(([property, value], index) => {
       const percentage = (value / maxValue) * 100
-      const barHeight = Math.max(percentage, 3) // Minimum height for visibility
+      console.log(`Bar ${property}: ${value} (${percentage}%)`)
 
       // Create bar container
       const barContainer = document.createElement("div")
-      barContainer.className = "flex flex-col space-y-1"
+      barContainer.className = "flex flex-col items-center"
+      barContainer.style.width = `${100 / propertyEntries.length}%`
+      barContainer.style.maxWidth = "100px"
+      barContainer.style.minWidth = "60px"
 
       // Create the bar
+      const barOuter = document.createElement("div")
+      barOuter.className = "relative w-full px-1 h-full flex items-end"
+
       const bar = document.createElement("div")
-      bar.className =
-        "relative h-8 w-full overflow-hidden rounded bg-zinc-800 cursor-pointer transition-all hover:brightness-110"
+      bar.className = "w-full cursor-pointer transition-all hover:brightness-110 bg-blue-500 rounded-t"
+
+      // Ensure minimum height for visibility and calculate height based on percentage
+      const barHeightPercent = Math.max(percentage, 1)
+      bar.style.height = `${barHeightPercent}%`
+
+      console.log(`Setting bar height to ${barHeightPercent}%`)
+
       bar.setAttribute("data-property", property)
 
       // Add click event listener
@@ -95,51 +147,39 @@ export function PropertyMetricsChart({ data, propertyDetails = {} }: PropertyMet
         setActiveTooltip(null)
       })
 
-      // Create the bar fill with neutral colors
-      const barFill = document.createElement("div")
+      // Add value label on top of bar
+      const valueLabel = document.createElement("div")
+      valueLabel.className = "absolute -top-6 left-0 right-0 text-center text-xs font-medium text-zinc-100"
+      valueLabel.textContent = formatCurrency(value)
 
-      // Use more neutral, monochromatic colors
-      const colors = [
-        "bg-zinc-400",
-        "bg-zinc-500",
-        "bg-zinc-600",
-        "bg-zinc-700",
-        "bg-zinc-500/80",
-        "bg-zinc-600/80",
-        "bg-zinc-400/90",
-        "bg-zinc-500/90",
-      ]
+      barOuter.appendChild(bar)
+      barOuter.appendChild(valueLabel)
+      barContainer.appendChild(barOuter)
 
-      barFill.className = `absolute inset-y-0 left-0 ${colors[index % colors.length]}`
-      barFill.style.width = `${percentage}%`
-
-      // Create the label
-      const label = document.createElement("div")
-      label.className = "absolute inset-y-0 left-2 flex items-center text-xs font-medium text-zinc-100"
-      label.textContent = property
-
-      // Create the value
-      const valueElement = document.createElement("div")
-      valueElement.className = "absolute inset-y-0 right-2 flex items-center text-xs font-medium text-zinc-100"
-      valueElement.textContent = formatCurrency(value)
-
-      // Assemble the bar
-      bar.appendChild(barFill)
-      bar.appendChild(label)
-      bar.appendChild(valueElement)
-
-      // Add the bar to the container
-      barContainer.appendChild(bar)
-
-      // Add percentage of total
-      const percentOfTotal = document.createElement("div")
-      percentOfTotal.className = "text-xs text-zinc-500"
-      percentOfTotal.textContent = `${((value / total) * 100).toFixed(1)}% of total`
-      barContainer.appendChild(percentOfTotal)
-
-      // Add the bar container to the chart
-      chartContainer.appendChild(barContainer)
+      barsWrapper.appendChild(barContainer)
     })
+
+    barsContainer.appendChild(barsWrapper)
+    chartArea.appendChild(barsContainer)
+    chartContainer.appendChild(chartArea)
+
+    // Create x-axis
+    const xAxis = document.createElement("div")
+    xAxis.className = "flex justify-between px-1"
+
+    // Add x-axis labels
+    propertyEntries.forEach(([property]) => {
+      const label = document.createElement("div")
+      label.className = "text-xs text-zinc-400 text-center truncate px-1"
+      label.style.width = `${100 / propertyEntries.length}%`
+      label.style.maxWidth = "100px"
+      label.style.minWidth = "60px"
+      label.title = property // Show full name on hover
+      label.textContent = property
+      xAxis.appendChild(label)
+    })
+
+    chartContainer.appendChild(xAxis)
 
     // Add the chart to the container
     chartRef.current.appendChild(chartContainer)
@@ -155,7 +195,7 @@ export function PropertyMetricsChart({ data, propertyDetails = {} }: PropertyMet
   }
 
   return (
-    <div className="relative">
+    <div className="relative h-[400px]">
       <div ref={chartRef} className="h-full w-full" />
 
       {/* Tooltips */}
@@ -167,6 +207,9 @@ export function PropertyMetricsChart({ data, propertyDetails = {} }: PropertyMet
         }
 
         const isPositiveChange = Number.parseFloat(details.changePercentage) >= 0
+        const propertyValue = data[property]
+        const total = Object.values(data).reduce((sum, value) => sum + value, 0)
+        const percentage = ((propertyValue / total) * 100).toFixed(1)
 
         return (
           <div
@@ -178,17 +221,17 @@ export function PropertyMetricsChart({ data, propertyDetails = {} }: PropertyMet
           >
             <div className="text-sm font-medium mb-1">{property}</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              <div className="text-zinc-400">Total spend:</div>
+              <div>{formatCurrency(propertyValue)}</div>
+
+              <div className="text-zinc-400">Percentage of total:</div>
+              <div>{percentage}%</div>
+
               <div className="text-zinc-400">Number of receipts:</div>
               <div>{details.count}</div>
 
               <div className="text-zinc-400">Last transaction:</div>
               <div>{details.lastTransaction}</div>
-
-              <div className="text-zinc-400">Change from last period:</div>
-              <div className={isPositiveChange ? "text-green-400" : "text-red-400"}>
-                {isPositiveChange ? "+" : ""}
-                {details.changePercentage}%
-              </div>
             </div>
             <div className="text-xs mt-2 text-zinc-400">Click to filter receipts</div>
 
