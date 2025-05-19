@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getMediaContent } from "@/lib/twilio-client"
 import { supabase } from "@/lib/supabase"
-import { processReceiptImage } from "@/lib/receipt-processor"
+import { processReceiptImage } from "@/lib/receipt-processor-simple"
 import { v4 as uuidv4 } from "uuid"
 
 export async function POST(req: NextRequest) {
@@ -40,11 +39,6 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      // Fetch the image using authenticated request
-      console.log("🔄 Fetching image from Twilio...")
-      const imageBuffer = await getMediaContent(mediaUrl)
-      console.log("✅ Successfully downloaded image, size:", imageBuffer.length, "bytes")
-
       // Try to find a staff member with this phone number
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -57,10 +51,10 @@ export async function POST(req: NextRequest) {
         // Still process the receipt, but without staff info
       }
 
-      // Process the receipt image with AI
-      console.log("🤖 Processing receipt with AI...")
+      // Process the receipt image with simple processor
+      console.log("📝 Processing receipt...")
       const receiptData = await processReceiptImage(mediaUrl, body)
-      console.log("✅ AI processing complete:", receiptData)
+      console.log("✅ Processing complete:", receiptData)
 
       // Generate a unique ID for the receipt
       const receiptId = uuidv4()
