@@ -5,6 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { supabase } from "@/lib/supabase"
 import { formatCurrency } from "@/lib/utils"
 import type { Receipt } from "@/lib/types"
+import { RefreshButton } from "@/components/refresh-button"
+
+// Disable caching for this route
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 // Function to fetch receipts from Supabase
 async function getReceipts(): Promise<Receipt[]> {
@@ -23,6 +28,7 @@ async function getReceipts(): Promise<Receipt[]> {
     phoneNumber: row.phone_number,
     staffId: row.staff_id,
     staffName: row.staff_name,
+    property: row.property,
     imageUrl: row.image_url,
     createdAt: row.created_at,
   }))
@@ -115,18 +121,25 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mt-8">
-        <Tabs defaultValue="all" className="w-full">
-          <TabsList className="bg-zinc-900/50">
-            <TabsTrigger value="all">All Receipts</TabsTrigger>
-            <TabsTrigger value="recent">Recent</TabsTrigger>
-          </TabsList>
-          <TabsContent value="all" className="mt-4">
-            <ReceiptTable receipts={receipts} />
-          </TabsContent>
-          <TabsContent value="recent" className="mt-4">
-            <ReceiptTable receipts={receipts.filter((receipt) => new Date(receipt.date) >= thirtyDaysAgo)} />
-          </TabsContent>
-        </Tabs>
+        <div className="flex items-center justify-between mb-4">
+          <Tabs defaultValue="all" className="w-full">
+            <div className="flex items-center justify-between">
+              <TabsList className="bg-zinc-900/50">
+                <TabsTrigger value="all">All Receipts</TabsTrigger>
+                <TabsTrigger value="recent">Recent</TabsTrigger>
+              </TabsList>
+
+              <RefreshButton />
+            </div>
+
+            <TabsContent value="all" className="mt-4">
+              <ReceiptTable receipts={receipts} />
+            </TabsContent>
+            <TabsContent value="recent" className="mt-4">
+              <ReceiptTable receipts={receipts.filter((receipt) => new Date(receipt.date) >= thirtyDaysAgo)} />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   )

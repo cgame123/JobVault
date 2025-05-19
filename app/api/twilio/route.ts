@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getMediaContent } from "@/lib/twilio-client"
 import { supabase } from "@/lib/supabase"
 import { processReceiptImage } from "@/lib/receipt-processor"
+import { sendConfirmationSMS } from "@/lib/twilio-sender"
 import { v4 as uuidv4 } from "uuid"
 
 export async function POST(req: NextRequest) {
@@ -27,6 +28,10 @@ export async function POST(req: NextRequest) {
     // Check if we have an image
     if (!mediaUrl || numMedia === "0") {
       console.log("ℹ️ No image was provided in the message")
+
+      // Send a response asking for an image
+      await sendConfirmationSMS(from, "Please send a photo of your receipt along with your message.")
+
       return NextResponse.json(
         {
           success: true,
@@ -43,7 +48,11 @@ export async function POST(req: NextRequest) {
       console.log("✅ Successfully downloaded image, size:", imageBuffer.length, "bytes")
 
       // Try to find a staff member with this phone number
-      const { data: staffData } = await supabase.from("staff").select("id, name").eq("phone_number", from).maybeSingle()
+      const { data: staffData } = await supabase
+        .from("staff")
+        .select("id, name, property")
+        .eq("phone_number", from)
+        .maybeSingle()
 
       // Process the receipt image with AI
       console.log("🧠 Processing receipt with AI...")
@@ -62,12 +71,17 @@ export async function POST(req: NextRequest) {
         phone_number: from,
         staff_id: staffData?.id || null,
         staff_name: staffData?.name || null,
+        property: staffData?.property || null,
         image_url: mediaUrl,
         created_at: new Date().toISOString(),
       })
 
       if (insertError) {
         console.error("❌ Error inserting receipt into Supabase:", insertError)
+
+        // Send error notification
+        await sendConfirmationSMS(from, "There was an error processing your receipt. Please try again later.")
+
         return NextResponse.json(
           {
             success: false,
@@ -79,6 +93,16 @@ export async function POST(req: NextRequest) {
       }
 
       console.log("💾 Receipt stored with ID:", receiptId)
+
+      // Send confirmation SMS
+      const staffName = staffData?.name ? ` ${staffData.name}` : ""
+      const propertyInfo = staffData?.property ? ` for ${staffData.property}` : ""
+      const amountText = receiptData.amount > 0 ? ` for ${formatCurrency(receiptData.amount)}` : ""
+
+      await sendConfirmationSMS(
+        from,
+        `Thanks${staffName}! Your receipt from ${receiptData.vendor}${amountText}${propertyInfo} has been received and processed. Receipt ID: ${receiptId.substring(0, 8)}`,
+      )
 
       // Return a success response
       return NextResponse.json(
@@ -96,6 +120,13 @@ export async function POST(req: NextRequest) {
       )
     } catch (mediaError) {
       console.error("❌ Error handling media:", mediaError)
+
+      // Send error notification
+      await sendConfirmationSMS(
+        from,
+        "There was an error processing your receipt image. Please try again with a clearer photo.",
+      )
+
       return NextResponse.json(
         {
           success: false,
@@ -118,4 +149,12 @@ export async function POST(req: NextRequest) {
       { status: 200 },
     )
   }
+}
+
+// Helper function to format currency
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount)
 }
