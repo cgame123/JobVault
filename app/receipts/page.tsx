@@ -45,25 +45,25 @@ async function getReceipts(searchParams: {
   sort?: string
 }): Promise<Receipt[]> {
   try {
-    // Start with the base query
+    // Build the base query
     let query = supabase.from("receipts").select(`
-      id,
-      vendor,
-      amount,
-      date,
-      phone_number,
-      staff_id,
-      staff_name,
-      image_url,
-      created_at,
-      status,
-      paid,
-      staff:staff_id (
         id,
-        name,
-        property
-      )
-    `)
+        vendor,
+        amount,
+        date,
+        phone_number,
+        staff_id,
+        staff_name,
+        image_url,
+        created_at,
+        status,
+        paid,
+        staff:staff_id (
+          id,
+          name,
+          property
+        )
+      `)
 
     // Apply property filter if provided
     if (searchParams.property) {
@@ -83,9 +83,8 @@ async function getReceipts(searchParams: {
       query = query.eq("staff_id", searchParams.staff)
     }
 
-    // Apply status filter if provided - FIXED
+    // Apply status filter if provided
     if (searchParams.status) {
-      // Direct equality check for status
       query = query.eq("status", searchParams.status)
     }
 

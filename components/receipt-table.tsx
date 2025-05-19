@@ -17,13 +17,9 @@ interface ReceiptTableProps {
 }
 
 export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
-  const [receipts, setReceipts] = useState<Receipt[]>(
-    initialReceipts.map((receipt) => ({
-      ...receipt,
-      status: receipt.status || "processing", // Provide default status
-      paid: receipt.paid || false, // Provide default paid status
-    })),
-  )
+  // IMPORTANT: Use the passed receipts directly without modifying them
+  // This ensures we respect the server-side filtering
+  const [receipts, setReceipts] = useState<Receipt[]>(initialReceipts)
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
   const [imageLoading, setImageLoading] = useState(false)
   const [imageError, setImageError] = useState(false)
@@ -32,6 +28,11 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
+
+  // Update receipts when initialReceipts changes (due to filtering)
+  useEffect(() => {
+    setReceipts(initialReceipts)
+  }, [initialReceipts])
 
   // Function to create a proxy URL for Twilio images
   const getProxyImageUrl = (originalUrl: string, download = false) => {
@@ -137,6 +138,9 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
         title: "Status updated",
         description: `Receipt status has been updated to ${status}.`,
       })
+
+      // Refresh the page to ensure filters are applied correctly
+      router.refresh()
     } catch (error) {
       console.error("Error updating receipt status:", error)
       toast({
@@ -180,8 +184,11 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
       // Show success message
       toast({
         title: "Payment status updated",
-        description: `Receipt has been marked as ${paid ? "paid" : "unpaid"}.`,
+        description: `Receipt has been marked as ${paid ? "paid" : "pending"}.`,
       })
+
+      // Refresh the page to ensure filters are applied correctly
+      router.refresh()
     } catch (error) {
       console.error("Error updating payment status:", error)
       toast({
@@ -249,7 +256,10 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
                   <TableCell>
                     <div
                       className="relative h-10 w-10 cursor-pointer overflow-hidden rounded-md border border-zinc-700 bg-zinc-800"
-                      onClick={() => setSelectedReceipt(receipt)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedReceipt(receipt)
+                      }}
                     >
                       {/* Show a thumbnail of the receipt using our proxy */}
                       <div className="relative h-full w-full">
@@ -277,6 +287,7 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
                     >
                       <SelectTrigger
                         className={`w-[130px] border ${getStatusBadgeClass(receipt.status || "processing")}`}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <SelectValue />
                       </SelectTrigger>
@@ -314,7 +325,10 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
                       onValueChange={(value) => handlePaymentUpdate(receipt.id, value === "paid")}
                       disabled={isSubmitting}
                     >
-                      <SelectTrigger className={`w-[100px] border ${getPaymentBadgeClass(receipt.paid)}`}>
+                      <SelectTrigger
+                        className={`w-[100px] border ${getPaymentBadgeClass(receipt.paid)}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
