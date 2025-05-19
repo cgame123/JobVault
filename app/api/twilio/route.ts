@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
-import { processReceiptImage } from "@/lib/receipt-processor-simple"
+import { processReceiptImage } from "@/lib/receipt-processor-ai"
 import { v4 as uuidv4 } from "uuid"
 
 export async function POST(req: NextRequest) {
@@ -51,10 +51,10 @@ export async function POST(req: NextRequest) {
         // Still process the receipt, but without staff info
       }
 
-      // Process the receipt image with simple processor
-      console.log("📝 Processing receipt...")
+      // Process the receipt image with AI processor
+      console.log("🤖 Processing receipt with AI...")
       const receiptData = await processReceiptImage(mediaUrl, body)
-      console.log("✅ Processing complete:", receiptData)
+      console.log("✅ AI processing complete:", receiptData)
 
       // Generate a unique ID for the receipt
       const receiptId = uuidv4()
