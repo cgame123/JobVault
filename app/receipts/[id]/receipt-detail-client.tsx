@@ -1,9 +1,11 @@
 "use client"
 
 import type React from "react"
-import { useRouter } from "next/navigation"
+
+import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,7 +13,6 @@ import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, Download, ExternalLink, MapPin, User, Edit, Save, X, AlertCircle } from "lucide-react"
 import { ReceiptActions } from "@/components/receipt-actions"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { Input } from "@/components/ui/input"
 
@@ -21,13 +22,33 @@ function getProxyImageUrl(originalUrl: string, download = false) {
   return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}${download ? "&download=true" : ""}`
 }
 
-export default function ReceiptDetailsPage({ params }: { params: { id: string } }) {
-  const [receipt, setReceipt] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
+// Receipt type definition
+interface Receipt {
+  id: string
+  vendor: string
+  amount: number
+  date: string
+  phoneNumber: string
+  staffId: string
+  staffName: string
+  staffPhone?: string
+  staffRole?: string
+  property: string
+  imageUrl: string
+  createdAt: string
+  status: string
+  paid: boolean
+}
+
+export default function ReceiptDetailClient({ receipt }: { receipt: Receipt }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
-  const [editedReceipt, setEditedReceipt] = useState<any>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [editedReceipt, setEditedReceipt] = useState({
+    vendor: receipt.vendor,
+    amount: receipt.amount,
+    date: receipt.date,
+  })
+  const [currentReceipt, setCurrentReceipt] = useState<Receipt>(receipt)
   const [saveError, setSaveError] = useState<string | null>(null)
   const { toast } = useToast()
   const router = useRouter()
@@ -55,12 +76,10 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
 
   // Handle status update
   const handleStatusUpdate = async (status: string) => {
-    if (!receipt) return
     setIsSubmitting(true)
 
     try {
-      // Try the direct update endpoint
-      const response = await fetch(`/api/receipts/${receipt.id}/status`, {
+      const response = await fetch(`/api/receipts/${currentReceipt.id}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -69,15 +88,14 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to update receipt status")
+        const errorText = await response.text()
+        console.error("Error response:", errorText)
+        throw new Error(errorText || "Failed to update receipt status")
       }
 
-      const data = await response.json()
-
       // Update the local state
-      setReceipt({
-        ...receipt,
+      setCurrentReceipt({
+        ...currentReceipt,
         status,
       })
 
@@ -100,12 +118,10 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
 
   // Handle payment update
   const handlePaymentUpdate = async (paid: boolean) => {
-    if (!receipt) return
     setIsSubmitting(true)
 
     try {
-      // Try the direct update endpoint
-      const response = await fetch(`/api/receipts/${receipt.id}/status`, {
+      const response = await fetch(`/api/receipts/${currentReceipt.id}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -114,15 +130,14 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to update payment status")
+        const errorText = await response.text()
+        console.error("Error response:", errorText)
+        throw new Error(errorText || "Failed to update payment status")
       }
 
-      const data = await response.json()
-
       // Update the local state
-      setReceipt({
-        ...receipt,
+      setCurrentReceipt({
+        ...currentReceipt,
         paid,
       })
 
@@ -145,7 +160,6 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
 
   // Handle receipt details update
   const handleSaveDetails = async () => {
-    if (!receipt || !editedReceipt) return
     setIsSubmitting(true)
     setSaveError(null)
 
@@ -159,7 +173,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
         return
       }
 
-      if (isNaN(editedReceipt.amount) || Number.parseFloat(editedReceipt.amount) <= 0) {
+      if (isNaN(Number(editedReceipt.amount)) || Number(editedReceipt.amount) <= 0) {
         setSaveError("Amount must be a positive number")
         setIsSubmitting(false)
         return
@@ -171,15 +185,15 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
         return
       }
 
-      // Use the new update endpoint with POST method
-      const response = await fetch(`/api/receipts/${receipt.id}/update`, {
+      // Use simple fetch with POST method
+      const response = await fetch(`/api/receipts/${currentReceipt.id}/simple-update`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           vendor: editedReceipt.vendor,
-          amount: Number.parseFloat(editedReceipt.amount),
+          amount: Number(editedReceipt.amount),
           date: editedReceipt.date,
         }),
       })
@@ -188,28 +202,14 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
       if (!response.ok) {
         const errorText = await response.text()
         console.error("Error response:", errorText)
-
-        let errorMessage = "Failed to update receipt details"
-        try {
-          const errorData = JSON.parse(errorText)
-          if (errorData.error) {
-            errorMessage = errorData.error
-          }
-        } catch (e) {
-          // If we can't parse the error as JSON, use the raw text
-          errorMessage = errorText || "Unknown error"
-        }
-
-        throw new Error(errorMessage)
+        throw new Error(errorText || "Failed to update receipt details")
       }
 
-      const data = await response.json()
-
       // Update the local state
-      setReceipt({
-        ...receipt,
+      setCurrentReceipt({
+        ...currentReceipt,
         vendor: editedReceipt.vendor,
-        amount: Number.parseFloat(editedReceipt.amount),
+        amount: Number(editedReceipt.amount),
         date: editedReceipt.date,
       })
 
@@ -248,99 +248,21 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
     if (isEditing) {
       // Cancel editing - reset to original values
       setEditedReceipt({
-        vendor: receipt.vendor,
-        amount: receipt.amount,
-        date: receipt.date,
+        vendor: currentReceipt.vendor,
+        amount: currentReceipt.amount,
+        date: currentReceipt.date,
       })
       setIsEditing(false)
       setSaveError(null)
     } else {
       // Start editing - copy current values
       setEditedReceipt({
-        vendor: receipt.vendor,
-        amount: receipt.amount,
-        date: receipt.date,
+        vendor: currentReceipt.vendor,
+        amount: currentReceipt.amount,
+        date: currentReceipt.date,
       })
       setIsEditing(true)
     }
-  }
-
-  // Fetch receipt data
-  useEffect(() => {
-    async function loadReceipt() {
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch(`/api/receipts/${params.id}`)
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch receipt")
-        }
-
-        const data = await response.json()
-
-        if (!data) {
-          setError("Receipt not found. It may have been deleted or you don't have permission to view it.")
-          setIsLoading(false)
-          return
-        }
-
-        setReceipt(data)
-        setEditedReceipt({
-          vendor: data.vendor || "",
-          amount: data.amount || 0,
-          date: data.date || new Date().toISOString().split("T")[0],
-        })
-      } catch (err) {
-        console.error("Error in loadReceipt:", err)
-        setError("An error occurred while loading the receipt. Please try again.")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadReceipt()
-  }, [params.id])
-
-  // Show loading state
-  if (isLoading) {
-    return (
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="flex h-96 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-500 border-t-zinc-100"></div>
-        </div>
-      </div>
-    )
-  }
-
-  // Show error state
-  if (error || !receipt) {
-    return (
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <Button asChild variant="outline" size="sm" className="text-zinc-400 hover:text-zinc-100">
-            <Link href="/receipts">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Receipts
-            </Link>
-          </Button>
-        </div>
-        <Card className="border-zinc-800 bg-zinc-900/50 shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-red-400">Error Loading Receipt</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-zinc-300">{error || "Receipt not found or an error occurred."}</p>
-          </CardContent>
-          <CardFooter>
-            <Button variant="outline" onClick={() => router.refresh()} className="text-zinc-400 hover:text-zinc-100">
-              Try Again
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    )
   }
 
   return (
@@ -382,7 +304,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
               Edit Details
             </Button>
           )}
-          <ReceiptActions receipt={receipt} />
+          <ReceiptActions receipt={currentReceipt} />
         </div>
       </div>
 
@@ -391,13 +313,13 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
         <Card className="md:col-span-2 border-zinc-800 bg-zinc-900/50 shadow-lg">
           <CardHeader>
             <CardTitle>Receipt Image</CardTitle>
-            <CardDescription className="text-zinc-400">Original receipt from {receipt.vendor}</CardDescription>
+            <CardDescription className="text-zinc-400">Original receipt from {currentReceipt.vendor}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="relative aspect-[3/4] w-full overflow-hidden rounded-md border border-zinc-700 bg-zinc-800">
               <Image
-                src={getProxyImageUrl(receipt.imageUrl) || "/placeholder.svg"}
-                alt={`Receipt from ${receipt.vendor}`}
+                src={getProxyImageUrl(currentReceipt.imageUrl) || "/placeholder.svg"}
+                alt={`Receipt from ${currentReceipt.vendor}`}
                 fill
                 className="object-contain"
                 unoptimized
@@ -408,7 +330,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(getProxyImageUrl(receipt.imageUrl), "_blank")}
+              onClick={() => window.open(getProxyImageUrl(currentReceipt.imageUrl), "_blank")}
               className="text-zinc-400 hover:text-zinc-100"
             >
               <ExternalLink className="mr-2 h-4 w-4" />
@@ -417,7 +339,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(getProxyImageUrl(receipt.imageUrl, true), "_blank")}
+              onClick={() => window.open(getProxyImageUrl(currentReceipt.imageUrl, true), "_blank")}
               className="text-zinc-400 hover:text-zinc-100"
             >
               <Download className="mr-2 h-4 w-4" />
@@ -430,7 +352,9 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
         <Card className="md:col-span-3 border-zinc-800 bg-zinc-900/50 shadow-lg">
           <CardHeader>
             <CardTitle>Receipt Details</CardTitle>
-            <CardDescription className="text-zinc-400">Submitted on {formatDate(receipt.createdAt)}</CardDescription>
+            <CardDescription className="text-zinc-400">
+              Submitted on {formatDate(currentReceipt.createdAt)}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Save Error Message */}
@@ -493,10 +417,10 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
               ) : (
                 <>
                   <div className="flex justify-between">
-                    <h3 className="text-lg font-semibold text-zinc-100">{receipt.vendor}</h3>
-                    <span className="text-lg font-bold text-zinc-100">{formatCurrency(receipt.amount)}</span>
+                    <h3 className="text-lg font-semibold text-zinc-100">{currentReceipt.vendor}</h3>
+                    <span className="text-lg font-bold text-zinc-100">{formatCurrency(currentReceipt.amount)}</span>
                   </div>
-                  <div className="text-sm text-zinc-400">Purchase Date: {formatDate(receipt.date)}</div>
+                  <div className="text-sm text-zinc-400">Purchase Date: {formatDate(currentReceipt.date)}</div>
                 </>
               )}
             </div>
@@ -506,11 +430,11 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-zinc-400">Status</h3>
                 <Select
-                  value={receipt.status}
+                  value={currentReceipt.status}
                   onValueChange={(value) => handleStatusUpdate(value)}
                   disabled={isSubmitting || isEditing}
                 >
-                  <SelectTrigger className={`w-full border ${getStatusBadgeClass(receipt.status)}`}>
+                  <SelectTrigger className={`w-full border ${getStatusBadgeClass(currentReceipt.status)}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
@@ -545,11 +469,11 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-zinc-400">Payment</h3>
                 <Select
-                  value={receipt.paid ? "paid" : "pending"}
+                  value={currentReceipt.paid ? "paid" : "pending"}
                   onValueChange={(value) => handlePaymentUpdate(value === "paid")}
                   disabled={isSubmitting || isEditing}
                 >
-                  <SelectTrigger className={`w-full border ${getPaymentBadgeClass(receipt.paid)}`}>
+                  <SelectTrigger className={`w-full border ${getPaymentBadgeClass(currentReceipt.paid)}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
@@ -579,9 +503,15 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
                 Staff Information
               </h3>
               <div className="rounded-md bg-zinc-800/50 p-3">
-                <div className="mb-1 text-sm font-medium text-zinc-100">{receipt.staffName || "Unknown Staff"}</div>
-                {receipt.staffRole && <div className="text-xs text-zinc-400">Role: {receipt.staffRole}</div>}
-                {receipt.staffPhone && <div className="text-xs text-zinc-400">Phone: {receipt.staffPhone}</div>}
+                <div className="mb-1 text-sm font-medium text-zinc-100">
+                  {currentReceipt.staffName || "Unknown Staff"}
+                </div>
+                {currentReceipt.staffRole && (
+                  <div className="text-xs text-zinc-400">Role: {currentReceipt.staffRole}</div>
+                )}
+                {currentReceipt.staffPhone && (
+                  <div className="text-xs text-zinc-400">Phone: {currentReceipt.staffPhone}</div>
+                )}
               </div>
             </div>
 
@@ -592,16 +522,16 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
                 Property
               </h3>
               <div className="rounded-md bg-zinc-800/50 p-3">
-                <div className="text-sm font-medium text-zinc-100">{receipt.property || "Unassigned"}</div>
+                <div className="text-sm font-medium text-zinc-100">{currentReceipt.property || "Unassigned"}</div>
               </div>
             </div>
 
             {/* Technical details */}
             <Separator className="bg-zinc-800" />
             <div className="space-y-2 text-xs text-zinc-500">
-              <div>Receipt ID: {receipt.id}</div>
-              <div>Submitted via: SMS to {receipt.phoneNumber}</div>
-              <div>Processed on: {new Date(receipt.createdAt).toLocaleString()}</div>
+              <div>Receipt ID: {currentReceipt.id}</div>
+              <div>Submitted via: SMS to {currentReceipt.phoneNumber}</div>
+              <div>Processed on: {new Date(currentReceipt.createdAt).toLocaleString()}</div>
             </div>
           </CardContent>
         </Card>
