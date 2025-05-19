@@ -36,7 +36,10 @@ export function ReceiptActions({ receipt }: ReceiptActionsProps) {
 
   // Get status badge class based on status
   const getStatusBadgeClass = (status: string) => {
-    switch (status) {
+    // Convert to lowercase for case-insensitive comparison
+    const statusLower = status?.toLowerCase() || ""
+
+    switch (statusLower) {
       case "processing":
         return "bg-blue-900/30 text-blue-300 border-blue-800"
       case "approved":
@@ -170,25 +173,25 @@ export function ReceiptActions({ receipt }: ReceiptActionsProps) {
                   </SelectTrigger>
                   <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
                     <SelectItem
-                      value="processing"
+                      value="Processing"
                       className="bg-blue-900/30 text-blue-300 focus:bg-blue-900/50 focus:text-blue-100"
                     >
                       Processing
                     </SelectItem>
                     <SelectItem
-                      value="approved"
+                      value="Approved"
                       className="bg-green-900/30 text-green-300 focus:bg-green-900/50 focus:text-green-100"
                     >
                       Approved
                     </SelectItem>
                     <SelectItem
-                      value="rejected"
+                      value="Rejected"
                       className="bg-red-900/30 text-red-300 focus:bg-red-900/50 focus:text-red-100"
                     >
                       Rejected
                     </SelectItem>
                     <SelectItem
-                      value="duplicate"
+                      value="Duplicate"
                       className="bg-purple-900/30 text-purple-300 focus:bg-purple-900/50 focus:text-purple-100"
                     >
                       Duplicate

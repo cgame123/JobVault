@@ -105,7 +105,10 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
 
   // Get status badge class based on status
   const getStatusBadgeClass = (status: string) => {
-    switch (status) {
+    // Convert to lowercase for case-insensitive comparison
+    const statusLower = status?.toLowerCase() || ""
+
+    switch (statusLower) {
       case "processing":
         return "bg-blue-900/30 text-blue-300 border-blue-800"
       case "approved":
@@ -222,36 +225,36 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
             <DropdownMenuItem
               className={cn(
                 "cursor-pointer bg-blue-900/30 text-blue-300 hover:bg-blue-900/50 hover:text-blue-100",
-                currentStatus === "processing" && "font-medium",
+                currentStatus === "Processing" && "font-medium",
               )}
-              onClick={() => applyFilters({ status: "processing" })}
+              onClick={() => applyFilters({ status: "Processing" })}
             >
               Processing
             </DropdownMenuItem>
             <DropdownMenuItem
               className={cn(
                 "cursor-pointer bg-green-900/30 text-green-300 hover:bg-green-900/50 hover:text-green-100",
-                currentStatus === "approved" && "font-medium",
+                currentStatus === "Approved" && "font-medium",
               )}
-              onClick={() => applyFilters({ status: "approved" })}
+              onClick={() => applyFilters({ status: "Approved" })}
             >
               Approved
             </DropdownMenuItem>
             <DropdownMenuItem
               className={cn(
                 "cursor-pointer bg-red-900/30 text-red-300 hover:bg-red-900/50 hover:text-red-100",
-                currentStatus === "rejected" && "font-medium",
+                currentStatus === "Rejected" && "font-medium",
               )}
-              onClick={() => applyFilters({ status: "rejected" })}
+              onClick={() => applyFilters({ status: "Rejected" })}
             >
               Rejected
             </DropdownMenuItem>
             <DropdownMenuItem
               className={cn(
                 "cursor-pointer bg-purple-900/30 text-purple-300 hover:bg-purple-900/50 hover:text-purple-100",
-                currentStatus === "duplicate" && "font-medium",
+                currentStatus === "Duplicate" && "font-medium",
               )}
-              onClick={() => applyFilters({ status: "duplicate" })}
+              onClick={() => applyFilters({ status: "Duplicate" })}
             >
               Duplicate
             </DropdownMenuItem>

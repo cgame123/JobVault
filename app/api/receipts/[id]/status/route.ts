@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
 
-// Define valid status values to match the database constraint
-const VALID_STATUS_VALUES = ["processing", "approved", "rejected", "duplicate"]
+// Update the VALID_STATUS_VALUES constant to use capitalized values
+const VALID_STATUS_VALUES = ["Processing", "Approved", "Rejected", "Duplicate"]
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
