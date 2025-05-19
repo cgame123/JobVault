@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { notFound } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
@@ -10,7 +10,7 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Download, ExternalLink, MapPin, User, Edit, Save, X } from "lucide-react"
+import { ArrowLeft, Download, ExternalLink, MapPin, User, Edit, Save, X, AlertCircle } from "lucide-react"
 import { ReceiptActions } from "@/components/receipt-actions"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useState, useEffect } from "react"
@@ -23,45 +23,60 @@ export const revalidate = 0
 
 // Function to get a receipt by ID
 async function getReceiptById(id: string) {
-  const { data, error } = await supabase
-    .from("receipts")
-    .select(`
-      *,
-      staff:staff_id (
-        name,
-        phone_number,
-        role,
-        property
-      )
-    `)
-    .eq("id", id)
-    .single()
+  try {
+    console.log(`Fetching receipt with ID: ${id}`)
 
-  if (error || !data) {
-    console.error("Error fetching receipt:", error)
+    const { data, error } = await supabase
+      .from("receipts")
+      .select(`
+        *,
+        staff:staff_id (
+          name,
+          phone_number,
+          role,
+          property
+        )
+      `)
+      .eq("id", id)
+      .single()
+
+    if (error) {
+      console.error("Error fetching receipt:", error)
+      return null
+    }
+
+    if (!data) {
+      console.error("No receipt found with ID:", id)
+      return null
+    }
+
+    console.log("Receipt data:", data)
+
+    return {
+      id: data.id,
+      vendor: data.vendor || "",
+      amount: Number(data.amount) || 0,
+      date: data.date || new Date().toISOString().split("T")[0],
+      phoneNumber: data.phone_number,
+      staffId: data.staff_id,
+      staffName: data.staff?.name || data.staff_name || "Unknown",
+      staffPhone: data.staff?.phone_number,
+      staffRole: data.staff?.role,
+      property: data.staff?.property || "Unassigned",
+      imageUrl: data.image_url,
+      createdAt: data.created_at,
+      status: data.status || "processing",
+      paid: data.paid || false,
+    }
+  } catch (error) {
+    console.error("Exception fetching receipt:", error)
     return null
-  }
-
-  return {
-    id: data.id,
-    vendor: data.vendor,
-    amount: Number(data.amount),
-    date: data.date,
-    phoneNumber: data.phone_number,
-    staffId: data.staff_id,
-    staffName: data.staff?.name || data.staff_name,
-    staffPhone: data.staff?.phone_number,
-    staffRole: data.staff?.role,
-    property: data.staff?.property,
-    imageUrl: data.image_url,
-    createdAt: data.created_at,
-    status: data.status || "processing",
-    paid: data.paid || false,
   }
 }
 
 // Function to create a proxy URL for Twilio images
 function getProxyImageUrl(originalUrl: string, download = false) {
+  if (!originalUrl) return "/placeholder.svg"
   return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}${download ? "&download=true" : ""}`
 }
 
@@ -71,7 +86,10 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editedReceipt, setEditedReceipt] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const { toast } = useToast()
+  const router = useRouter()
 
   // Get status badge class based on status
   const getStatusBadgeClass = (status: string) => {
@@ -109,11 +127,12 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
         body: JSON.stringify({ status }),
       })
 
-      const data = await response.json()
-
       if (!response.ok) {
-        throw new Error(data.error || "Failed to update receipt status")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to update receipt status")
       }
+
+      const data = await response.json()
 
       // Update the local state
       setReceipt({
@@ -153,11 +172,12 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
         body: JSON.stringify({ paid }),
       })
 
-      const data = await response.json()
-
       if (!response.ok) {
-        throw new Error(data.error || "Failed to update payment status")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to update payment status")
       }
+
+      const data = await response.json()
 
       // Update the local state
       setReceipt({
@@ -168,7 +188,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
       // Show success message
       toast({
         title: "Payment status updated",
-        description: `Receipt has been marked as ${paid ? "paid" : "unpaid"}.`,
+        description: `Receipt has been marked as ${paid ? "paid" : "pending"}.`,
       })
     } catch (error) {
       console.error("Error updating payment status:", error)
@@ -186,8 +206,30 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
   const handleSaveDetails = async () => {
     if (!receipt || !editedReceipt) return
     setIsSubmitting(true)
+    setSaveError(null)
 
     try {
+      console.log("Saving receipt details:", editedReceipt)
+
+      // Validate inputs
+      if (!editedReceipt.vendor.trim()) {
+        setSaveError("Vendor name is required")
+        setIsSubmitting(false)
+        return
+      }
+
+      if (isNaN(editedReceipt.amount) || Number.parseFloat(editedReceipt.amount) <= 0) {
+        setSaveError("Amount must be a positive number")
+        setIsSubmitting(false)
+        return
+      }
+
+      if (!editedReceipt.date) {
+        setSaveError("Date is required")
+        setIsSubmitting(false)
+        return
+      }
+
       const response = await fetch(`/api/receipts/${receipt.id}/details`, {
         method: "PATCH",
         headers: {
@@ -224,6 +266,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
       setIsEditing(false)
     } catch (error) {
       console.error("Error updating receipt details:", error)
+      setSaveError(error instanceof Error ? error.message : "Failed to update receipt details")
       toast({
         title: "Error",
         description: "Failed to update receipt details.",
@@ -247,8 +290,13 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
   const toggleEditMode = () => {
     if (isEditing) {
       // Cancel editing - reset to original values
-      setEditedReceipt(receipt)
+      setEditedReceipt({
+        vendor: receipt.vendor,
+        amount: receipt.amount,
+        date: receipt.date,
+      })
       setIsEditing(false)
+      setSaveError(null)
     } else {
       // Start editing - copy current values
       setEditedReceipt({
@@ -264,28 +312,70 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
   useEffect(() => {
     async function loadReceipt() {
       setIsLoading(true)
-      const data = await getReceiptById(params.id)
-      if (!data) {
-        notFound()
+      setError(null)
+
+      try {
+        const data = await getReceiptById(params.id)
+
+        if (!data) {
+          setError("Receipt not found. It may have been deleted or you don't have permission to view it.")
+          setIsLoading(false)
+          return
+        }
+
+        setReceipt(data)
+        setEditedReceipt({
+          vendor: data.vendor,
+          amount: data.amount,
+          date: data.date,
+        })
+      } catch (err) {
+        console.error("Error in loadReceipt:", err)
+        setError("An error occurred while loading the receipt. Please try again.")
+      } finally {
+        setIsLoading(false)
       }
-      setReceipt(data)
-      setEditedReceipt({
-        vendor: data.vendor,
-        amount: data.amount,
-        date: data.date,
-      })
-      setIsLoading(false)
     }
 
     loadReceipt()
   }, [params.id])
 
-  if (isLoading || !receipt) {
+  // Show loading state
+  if (isLoading) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex h-96 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-500 border-t-zinc-100"></div>
         </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error || !receipt) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <Button asChild variant="outline" size="sm" className="text-zinc-400 hover:text-zinc-100">
+            <Link href="/receipts">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Receipts
+            </Link>
+          </Button>
+        </div>
+        <Card className="border-zinc-800 bg-zinc-900/50 shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-red-400">Error Loading Receipt</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-zinc-300">{error || "Receipt not found or an error occurred."}</p>
+          </CardContent>
+          <CardFooter>
+            <Button variant="outline" onClick={() => router.refresh()} className="text-zinc-400 hover:text-zinc-100">
+              Try Again
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     )
   }
@@ -380,6 +470,14 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
             <CardDescription className="text-zinc-400">Submitted on {formatDate(receipt.createdAt)}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Save Error Message */}
+            {saveError && (
+              <div className="rounded-md bg-red-900/20 border border-red-800 p-3 flex items-start">
+                <AlertCircle className="h-5 w-5 text-red-400 mr-2 mt-0.5" />
+                <div className="text-sm text-red-300">{saveError}</div>
+              </div>
+            )}
+
             {/* Basic receipt info */}
             <div className="space-y-4">
               {isEditing ? (
@@ -394,6 +492,8 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
                       value={editedReceipt.vendor}
                       onChange={handleInputChange}
                       className="border-zinc-700 bg-zinc-800 text-zinc-100"
+                      placeholder="Enter vendor name"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -408,6 +508,8 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
                       value={editedReceipt.amount}
                       onChange={handleInputChange}
                       className="border-zinc-700 bg-zinc-800 text-zinc-100"
+                      placeholder="0.00"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -421,6 +523,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
                       value={editedReceipt.date}
                       onChange={handleInputChange}
                       className="border-zinc-700 bg-zinc-800 text-zinc-100"
+                      required
                     />
                   </div>
                 </>
@@ -442,7 +545,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
                 <Select
                   value={receipt.status}
                   onValueChange={(value) => handleStatusUpdate(value)}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isEditing}
                 >
                   <SelectTrigger className={`w-full border ${getStatusBadgeClass(receipt.status)}`}>
                     <SelectValue />
@@ -479,9 +582,9 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-zinc-400">Payment</h3>
                 <Select
-                  value={receipt.paid ? "paid" : "unpaid"}
+                  value={receipt.paid ? "paid" : "pending"}
                   onValueChange={(value) => handlePaymentUpdate(value === "paid")}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isEditing}
                 >
                   <SelectTrigger className={`w-full border ${getPaymentBadgeClass(receipt.paid)}`}>
                     <SelectValue />
@@ -494,7 +597,7 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
                       Paid
                     </SelectItem>
                     <SelectItem
-                      value="unpaid"
+                      value="pending"
                       className="bg-zinc-700/50 text-zinc-300 focus:bg-zinc-700/70 focus:text-zinc-100"
                     >
                       Pending
