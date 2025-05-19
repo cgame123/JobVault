@@ -241,7 +241,11 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
               </TableRow>
             ) : (
               receipts.map((receipt) => (
-                <TableRow key={receipt.id} className="border-zinc-800 hover:bg-zinc-800/50">
+                <TableRow
+                  key={receipt.id}
+                  className="border-zinc-800 hover:bg-zinc-800/50 cursor-pointer"
+                  onClick={() => (window.location.href = `/receipts/${receipt.id}`)}
+                >
                   <TableCell>
                     <div
                       className="relative h-10 w-10 cursor-pointer overflow-hidden rounded-md border border-zinc-700 bg-zinc-800"
@@ -329,11 +333,14 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
                       </SelectContent>
                     </Select>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => (window.location.href = `/receipts/${receipt.id}`)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        window.location.href = `/receipts/${receipt.id}`
+                      }}
                       className="text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
                     >
                       <Eye className="h-4 w-4" />
@@ -342,7 +349,10 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleDeleteClick(receipt)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteClick(receipt)
+                      }}
                       className="text-zinc-400 hover:bg-zinc-800 hover:text-red-400"
                     >
                       <Trash className="h-4 w-4" />

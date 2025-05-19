@@ -6,7 +6,6 @@ import { PropertyMetricsChart } from "@/components/property-metrics-chart"
 import { DashboardSkeleton } from "@/components/dashboard-skeleton"
 import { ActivityFeed } from "@/components/activity-feed"
 import { RefreshButton } from "@/components/refresh-button"
-import { ReceiptTable } from "@/components/receipt-table"
 import type { Receipt } from "@/lib/types"
 
 // Disable caching for this route
@@ -249,15 +248,6 @@ async function DashboardContent() {
           <Suspense fallback={<div className="h-[400px] animate-pulse rounded-lg bg-zinc-800/50" />}>
             <ActivityFeed />
           </Suspense>
-        </div>
-      </div>
-
-      <div className="border-zinc-800 bg-zinc-900/50 shadow-lg rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-800">
-          <h2 className="text-xl font-semibold text-zinc-100">All Receipts</h2>
-        </div>
-        <div className="p-6">
-          <ReceiptTable receipts={receipts} />
         </div>
       </div>
     </div>

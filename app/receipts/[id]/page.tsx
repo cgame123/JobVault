@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { notFound } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
@@ -8,11 +10,12 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Download, ExternalLink, MapPin, User } from "lucide-react"
+import { ArrowLeft, Download, ExternalLink, MapPin, User, Edit, Save, X } from "lucide-react"
 import { ReceiptActions } from "@/components/receipt-actions"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
+import { Input } from "@/components/ui/input"
 
 // Disable caching for this route
 export const dynamic = "force-dynamic"
@@ -66,6 +69,8 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
   const [receipt, setReceipt] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedReceipt, setEditedReceipt] = useState<any>(null)
   const { toast } = useToast()
 
   // Get status badge class based on status
@@ -177,16 +182,103 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
     }
   }
 
-  // Fetch receipt data
-  useState(async () => {
-    setIsLoading(true)
-    const data = await getReceiptById(params.id)
-    if (!data) {
-      notFound()
+  // Handle receipt details update
+  const handleSaveDetails = async () => {
+    if (!receipt || !editedReceipt) return
+    setIsSubmitting(true)
+
+    try {
+      const response = await fetch(`/api/receipts/${receipt.id}/details`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          vendor: editedReceipt.vendor,
+          amount: Number.parseFloat(editedReceipt.amount),
+          date: editedReceipt.date,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update receipt details")
+      }
+
+      // Update the local state
+      setReceipt({
+        ...receipt,
+        vendor: editedReceipt.vendor,
+        amount: Number.parseFloat(editedReceipt.amount),
+        date: editedReceipt.date,
+      })
+
+      // Show success message
+      toast({
+        title: "Receipt updated",
+        description: "Receipt details have been updated successfully.",
+      })
+
+      // Exit edit mode
+      setIsEditing(false)
+    } catch (error) {
+      console.error("Error updating receipt details:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update receipt details.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
     }
-    setReceipt(data)
-    setIsLoading(false)
-  })
+  }
+
+  // Handle input change for edited receipt
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setEditedReceipt({
+      ...editedReceipt,
+      [name]: value,
+    })
+  }
+
+  // Toggle edit mode
+  const toggleEditMode = () => {
+    if (isEditing) {
+      // Cancel editing - reset to original values
+      setEditedReceipt(receipt)
+      setIsEditing(false)
+    } else {
+      // Start editing - copy current values
+      setEditedReceipt({
+        vendor: receipt.vendor,
+        amount: receipt.amount,
+        date: receipt.date,
+      })
+      setIsEditing(true)
+    }
+  }
+
+  // Fetch receipt data
+  useEffect(() => {
+    async function loadReceipt() {
+      setIsLoading(true)
+      const data = await getReceiptById(params.id)
+      if (!data) {
+        notFound()
+      }
+      setReceipt(data)
+      setEditedReceipt({
+        vendor: data.vendor,
+        amount: data.amount,
+        date: data.date,
+      })
+      setIsLoading(false)
+    }
+
+    loadReceipt()
+  }, [params.id])
 
   if (isLoading || !receipt) {
     return (
@@ -202,12 +294,43 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center justify-between">
         <Button asChild variant="outline" size="sm" className="text-zinc-400 hover:text-zinc-100">
-          <Link href="/">
+          <Link href="/receipts">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Dashboard
+            Back to Receipts
           </Link>
         </Button>
-        <ReceiptActions receipt={receipt} />
+        <div className="flex gap-2">
+          {isEditing ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleEditMode}
+                className="text-zinc-400 hover:text-zinc-100"
+                disabled={isSubmitting}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleSaveDetails}
+                className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
+                disabled={isSubmitting}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </Button>
+            </>
+          ) : (
+            <Button variant="outline" size="sm" onClick={toggleEditMode} className="text-zinc-400 hover:text-zinc-100">
+              <Edit className="mr-2 h-4 w-4" />
+              Edit Details
+            </Button>
+          )}
+          <ReceiptActions receipt={receipt} />
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-5">
@@ -259,11 +382,57 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
           <CardContent className="space-y-6">
             {/* Basic receipt info */}
             <div className="space-y-4">
-              <div className="flex justify-between">
-                <h3 className="text-lg font-semibold text-zinc-100">{receipt.vendor}</h3>
-                <span className="text-lg font-bold text-zinc-100">{formatCurrency(receipt.amount)}</span>
-              </div>
-              <div className="text-sm text-zinc-400">Purchase Date: {formatDate(receipt.date)}</div>
+              {isEditing ? (
+                <>
+                  <div className="space-y-2">
+                    <label htmlFor="vendor" className="text-sm font-medium text-zinc-400">
+                      Vendor
+                    </label>
+                    <Input
+                      id="vendor"
+                      name="vendor"
+                      value={editedReceipt.vendor}
+                      onChange={handleInputChange}
+                      className="border-zinc-700 bg-zinc-800 text-zinc-100"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="amount" className="text-sm font-medium text-zinc-400">
+                      Amount
+                    </label>
+                    <Input
+                      id="amount"
+                      name="amount"
+                      type="number"
+                      step="0.01"
+                      value={editedReceipt.amount}
+                      onChange={handleInputChange}
+                      className="border-zinc-700 bg-zinc-800 text-zinc-100"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="date" className="text-sm font-medium text-zinc-400">
+                      Date
+                    </label>
+                    <Input
+                      id="date"
+                      name="date"
+                      type="date"
+                      value={editedReceipt.date}
+                      onChange={handleInputChange}
+                      className="border-zinc-700 bg-zinc-800 text-zinc-100"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <h3 className="text-lg font-semibold text-zinc-100">{receipt.vendor}</h3>
+                    <span className="text-lg font-bold text-zinc-100">{formatCurrency(receipt.amount)}</span>
+                  </div>
+                  <div className="text-sm text-zinc-400">Purchase Date: {formatDate(receipt.date)}</div>
+                </>
+              )}
             </div>
 
             {/* Status and Payment */}
