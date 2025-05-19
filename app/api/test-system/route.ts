@@ -5,7 +5,6 @@ export async function GET() {
   const results = {
     database: { status: "unknown", details: null },
     twilio: { status: "unknown", details: null },
-    groq: { status: "unknown", details: null },
     receipts: { status: "unknown", details: null },
     staff: { status: "unknown", details: null },
     environment: { status: "unknown", details: {} },
@@ -67,29 +66,6 @@ export async function GET() {
     if (!twilioAuthToken) missing.push("TWILIO_AUTH_TOKEN")
     if (!twilioPhoneNumber) missing.push("TWILIO_PHONE_NUMBER")
     results.twilio = { status: "warning", details: `Missing: ${missing.join(", ")}` }
-  }
-
-  // Check Groq API key
-  const groqApiKey = process.env.GROQ_API_KEY
-  if (groqApiKey) {
-    try {
-      // Import the necessary modules
-      const { groq } = await import("@ai-sdk/groq")
-      const { generateText } = await import("ai")
-
-      // Test a simple query
-      const { text } = await generateText({
-        model: groq("llama-3.1-8b-instant"),
-        prompt: "Say hello",
-        maxTokens: 10,
-      })
-
-      results.groq = { status: "ok", details: "Groq API is working" }
-    } catch (error) {
-      results.groq = { status: "error", details: String(error) }
-    }
-  } else {
-    results.groq = { status: "warning", details: "GROQ_API_KEY not found" }
   }
 
   // Check environment variables

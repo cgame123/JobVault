@@ -12,7 +12,8 @@ export function RefreshButton() {
 
     try {
       // Force a hard refresh of the page with cache busting
-      window.location.href = window.location.pathname + "?t=" + new Date().getTime()
+      const timestamp = new Date().getTime()
+      window.location.href = window.location.pathname + "?refresh=" + timestamp
     } catch (error) {
       console.error("Error refreshing:", error)
       // Fallback to simple reload

@@ -1,5 +1,4 @@
-import { processReceiptWithAPI } from "./receipt-api"
-
+// Receipt processor with fixed values for testing
 export async function processReceiptImage(
   imageUrl: string,
   messageText?: string,
@@ -9,31 +8,23 @@ export async function processReceiptImage(
   date: string
 }> {
   try {
-    console.log("Starting receipt processing with API for image:", imageUrl)
+    console.log("Starting receipt processing for image:", imageUrl)
+    console.log("Using fixed values for receipt data")
 
-    // Process the receipt with the API
-    const receiptData = await processReceiptWithAPI(imageUrl)
-
-    // If API couldn't determine the vendor but we have message text, use that
-    if (receiptData.vendor === "Unknown Vendor" && messageText && messageText.trim() !== "") {
-      receiptData.vendor = messageText.trim()
-    }
-
-    console.log("Extracted receipt data:", receiptData)
-
+    // Use fixed values as requested
     return {
-      vendor: receiptData.vendor,
-      amount: receiptData.amount,
-      date: receiptData.date,
+      vendor: "Trader Joe's",
+      amount: 51.91,
+      date: "2025-05-16", // Using ISO format YYYY-MM-DD for database compatibility
     }
   } catch (error) {
-    console.error("Error in receipt processing:", error)
+    console.error("Error in processReceiptImage:", error)
 
-    // Return fallback data
+    // Even in case of error, return the fixed values
     return {
-      vendor: messageText || "Unknown Vendor",
-      amount: 0,
-      date: new Date().toISOString().split("T")[0], // Today's date
+      vendor: "Trader Joe's",
+      amount: 51.91,
+      date: "2025-05-16",
     }
   }
 }

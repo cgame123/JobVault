@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { getMediaContent } from "@/lib/twilio-client"
 import { supabase } from "@/lib/supabase"
-import { processReceiptImage } from "@/lib/receipt-processor-ai"
+import { processReceiptImage } from "@/lib/receipt-processor"
 import { v4 as uuidv4 } from "uuid"
 
 export async function POST(req: NextRequest) {
@@ -27,8 +28,6 @@ export async function POST(req: NextRequest) {
     if (!mediaUrl || numMedia === "0") {
       console.log("ℹ️ No image was provided in the message")
 
-      // No confirmation SMS is sent even in this case
-
       return NextResponse.json(
         {
           success: true,
@@ -39,6 +38,11 @@ export async function POST(req: NextRequest) {
     }
 
     try {
+      // Fetch the image using authenticated request
+      console.log("🔄 Fetching image from Twilio...")
+      const imageBuffer = await getMediaContent(mediaUrl)
+      console.log("✅ Successfully downloaded image, size:", imageBuffer.length, "bytes")
+
       // Try to find a staff member with this phone number
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -51,10 +55,13 @@ export async function POST(req: NextRequest) {
         // Still process the receipt, but without staff info
       }
 
-      // Process the receipt image with AI processor
-      console.log("🤖 Processing receipt with AI...")
+      // Process the receipt image (using fixed values for demo)
+      console.log("📝 Processing receipt for demo...")
       const receiptData = await processReceiptImage(mediaUrl, body)
-      console.log("✅ AI processing complete:", receiptData)
+      console.log("✅ DEMO VALUES BEING USED:", receiptData)
+      console.log("   Vendor:", receiptData.vendor)
+      console.log("   Amount:", receiptData.amount)
+      console.log("   Date:", receiptData.date)
 
       // Generate a unique ID for the receipt
       const receiptId = uuidv4()
@@ -75,8 +82,6 @@ export async function POST(req: NextRequest) {
       if (insertError) {
         console.error("❌ Error inserting receipt into Supabase:", insertError)
 
-        // No error confirmation SMS is sent
-
         return NextResponse.json(
           {
             success: false,
@@ -88,8 +93,7 @@ export async function POST(req: NextRequest) {
       }
 
       console.log("💾 Receipt stored with ID:", receiptId)
-
-      // No confirmation SMS is sent anymore
+      console.log("🎯 DEMO RECEIPT STORED SUCCESSFULLY with fixed values")
 
       // Return a success response
       return NextResponse.json(
@@ -107,8 +111,6 @@ export async function POST(req: NextRequest) {
       )
     } catch (mediaError) {
       console.error("❌ Error handling media:", mediaError)
-
-      // No error confirmation SMS is sent
 
       return NextResponse.json(
         {
@@ -132,4 +134,12 @@ export async function POST(req: NextRequest) {
       { status: 200 },
     )
   }
+}
+
+// Helper function to format currency
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount)
 }
