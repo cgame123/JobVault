@@ -39,6 +39,7 @@ async function getProperties() {
 async function getReceipts(searchParams: {
   property?: string
   staff?: string
+  status?: string
   dateFrom?: string
   dateTo?: string
   sort?: string
@@ -60,6 +61,11 @@ async function getReceipts(searchParams: {
   // Apply staff filter if provided
   if (searchParams.staff) {
     query = query.eq("staff_id", searchParams.staff)
+  }
+
+  // Apply status filter if provided
+  if (searchParams.status) {
+    query = query.eq("status", searchParams.status)
   }
 
   // Apply date range filters if provided
@@ -108,8 +114,8 @@ async function getReceipts(searchParams: {
     property: row.staff ? row.staff.property : null,
     imageUrl: row.image_url,
     createdAt: row.created_at,
-    status: row.status,
-    paid: row.paid,
+    status: row.status || "submitted",
+    paid: row.paid || false,
   }))
 }
 
@@ -119,6 +125,7 @@ export default async function ReceiptsPage({
   searchParams: {
     property?: string
     staff?: string
+    status?: string
     dateFrom?: string
     dateTo?: string
     sort?: string

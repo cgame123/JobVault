@@ -31,6 +31,7 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
   // Get current filter values from URL
   const currentProperty = searchParams.get("property") || ""
   const currentStaff = searchParams.get("staff") || ""
+  const currentStatus = searchParams.get("status") || ""
   const currentDateFrom = searchParams.get("dateFrom") || ""
   const currentDateTo = searchParams.get("dateTo") || ""
   const currentSort = searchParams.get("sort") || "date-desc"
@@ -84,7 +85,29 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
   }, [dateFrom, dateTo])
 
   // Count active filters
-  const activeFilterCount = [currentProperty, currentStaff, currentDateFrom, currentDateTo].filter(Boolean).length
+  const activeFilterCount = [currentProperty, currentStaff, currentStatus, currentDateFrom, currentDateTo].filter(
+    Boolean,
+  ).length
+
+  // Get status badge class based on status
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case "submitted":
+        return "bg-zinc-700/50 text-zinc-300 border-zinc-600"
+      case "processing":
+        return "bg-blue-900/30 text-blue-300 border-blue-800"
+      case "needs_review":
+        return "bg-amber-900/30 text-amber-300 border-amber-800"
+      case "approved":
+        return "bg-green-900/30 text-green-300 border-green-800"
+      case "rejected":
+        return "bg-red-900/30 text-red-300 border-red-800"
+      case "duplicate":
+        return "bg-purple-900/30 text-purple-300 border-purple-800"
+      default:
+        return "bg-zinc-700/50 text-zinc-300 border-zinc-600"
+    }
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -156,6 +179,85 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
                 {staff.name}
               </DropdownMenuItem>
             ))}
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Status Filter */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700"
+          >
+            <Filter className="mr-2 h-3.5 w-3.5" />
+            Status
+            {currentStatus && (
+              <span className={`ml-1 rounded-full px-1.5 py-0.5 text-xs ${getStatusBadgeClass(currentStatus)}`}>
+                {currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1).replace(/_/g, " ")}
+              </span>
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56 border-zinc-800 bg-zinc-900 text-zinc-100">
+          <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
+          <DropdownMenuSeparator className="bg-zinc-800" />
+          <DropdownMenuGroup>
+            <DropdownMenuItem
+              className={cn(
+                "cursor-pointer bg-zinc-700/50 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100",
+                currentStatus === "submitted" && "font-medium",
+              )}
+              onClick={() => applyFilters({ status: "submitted" })}
+            >
+              Submitted
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className={cn(
+                "cursor-pointer bg-blue-900/30 text-blue-300 hover:bg-blue-900/50 hover:text-blue-100",
+                currentStatus === "processing" && "font-medium",
+              )}
+              onClick={() => applyFilters({ status: "processing" })}
+            >
+              Processing
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className={cn(
+                "cursor-pointer bg-amber-900/30 text-amber-300 hover:bg-amber-900/50 hover:text-amber-100",
+                currentStatus === "needs_review" && "font-medium",
+              )}
+              onClick={() => applyFilters({ status: "needs_review" })}
+            >
+              Needs Review
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className={cn(
+                "cursor-pointer bg-green-900/30 text-green-300 hover:bg-green-900/50 hover:text-green-100",
+                currentStatus === "approved" && "font-medium",
+              )}
+              onClick={() => applyFilters({ status: "approved" })}
+            >
+              Approved
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className={cn(
+                "cursor-pointer bg-red-900/30 text-red-300 hover:bg-red-900/50 hover:text-red-100",
+                currentStatus === "rejected" && "font-medium",
+              )}
+              onClick={() => applyFilters({ status: "rejected" })}
+            >
+              Rejected
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className={cn(
+                "cursor-pointer bg-purple-900/30 text-purple-300 hover:bg-purple-900/50 hover:text-purple-100",
+                currentStatus === "duplicate" && "font-medium",
+              )}
+              onClick={() => applyFilters({ status: "duplicate" })}
+            >
+              Duplicate
+            </DropdownMenuItem>
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>

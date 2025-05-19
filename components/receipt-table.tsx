@@ -194,6 +194,36 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
     }
   }
 
+  // Get status badge class based on status
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case "submitted":
+        return "bg-zinc-700/50 text-zinc-300 border-zinc-600"
+      case "processing":
+        return "bg-blue-900/30 text-blue-300 border-blue-800"
+      case "needs_review":
+        return "bg-amber-900/30 text-amber-300 border-amber-800"
+      case "approved":
+        return "bg-green-900/30 text-green-300 border-green-800"
+      case "rejected":
+        return "bg-red-900/30 text-red-300 border-red-800"
+      case "duplicate":
+        return "bg-purple-900/30 text-purple-300 border-purple-800"
+      default:
+        return "bg-zinc-700/50 text-zinc-300 border-zinc-600"
+    }
+  }
+
+  // Get payment badge class based on paid status
+  const getPaymentBadgeClass = (paid: boolean) => {
+    return paid ? "bg-green-900/30 text-green-300 border-green-800" : "bg-red-900/30 text-red-300 border-red-800"
+  }
+
+  // Format status label
+  const formatStatusLabel = (status: string) => {
+    return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ")
+  }
+
   return (
     <>
       <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50 shadow-lg">
@@ -250,45 +280,47 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
                       onValueChange={(value) => handleStatusUpdate(receipt.id, value)}
                       disabled={isSubmitting}
                     >
-                      <SelectTrigger className="w-[130px] border-zinc-700 bg-zinc-800 text-zinc-100">
+                      <SelectTrigger
+                        className={`w-[130px] border ${getStatusBadgeClass(receipt.status || "submitted")}`}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
-                        <SelectItem value="submitted">
-                          <div className="flex items-center">
-                            <div className="mr-2 h-2 w-2 rounded-full bg-zinc-400"></div>
-                            Submitted
-                          </div>
+                        <SelectItem
+                          value="submitted"
+                          className="bg-zinc-700/50 text-zinc-300 focus:bg-zinc-700 focus:text-zinc-100"
+                        >
+                          Submitted
                         </SelectItem>
-                        <SelectItem value="processing">
-                          <div className="flex items-center">
-                            <div className="mr-2 h-2 w-2 rounded-full bg-blue-400"></div>
-                            Processing
-                          </div>
+                        <SelectItem
+                          value="processing"
+                          className="bg-blue-900/30 text-blue-300 focus:bg-blue-900/50 focus:text-blue-100"
+                        >
+                          Processing
                         </SelectItem>
-                        <SelectItem value="needs_review">
-                          <div className="flex items-center">
-                            <div className="mr-2 h-2 w-2 rounded-full bg-amber-400"></div>
-                            Needs Review
-                          </div>
+                        <SelectItem
+                          value="needs_review"
+                          className="bg-amber-900/30 text-amber-300 focus:bg-amber-900/50 focus:text-amber-100"
+                        >
+                          Needs Review
                         </SelectItem>
-                        <SelectItem value="approved">
-                          <div className="flex items-center">
-                            <div className="mr-2 h-2 w-2 rounded-full bg-green-400"></div>
-                            Approved
-                          </div>
+                        <SelectItem
+                          value="approved"
+                          className="bg-green-900/30 text-green-300 focus:bg-green-900/50 focus:text-green-100"
+                        >
+                          Approved
                         </SelectItem>
-                        <SelectItem value="rejected">
-                          <div className="flex items-center">
-                            <div className="mr-2 h-2 w-2 rounded-full bg-red-400"></div>
-                            Rejected
-                          </div>
+                        <SelectItem
+                          value="rejected"
+                          className="bg-red-900/30 text-red-300 focus:bg-red-900/50 focus:text-red-100"
+                        >
+                          Rejected
                         </SelectItem>
-                        <SelectItem value="duplicate">
-                          <div className="flex items-center">
-                            <div className="mr-2 h-2 w-2 rounded-full bg-purple-400"></div>
-                            Duplicate
-                          </div>
+                        <SelectItem
+                          value="duplicate"
+                          className="bg-purple-900/30 text-purple-300 focus:bg-purple-900/50 focus:text-purple-100"
+                        >
+                          Duplicate
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -299,21 +331,21 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
                       onValueChange={(value) => handlePaymentUpdate(receipt.id, value === "paid")}
                       disabled={isSubmitting}
                     >
-                      <SelectTrigger className="w-[100px] border-zinc-700 bg-zinc-800 text-zinc-100">
+                      <SelectTrigger className={`w-[100px] border ${getPaymentBadgeClass(receipt.paid)}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
-                        <SelectItem value="paid">
-                          <div className="flex items-center">
-                            <div className="mr-2 h-2 w-2 rounded-full bg-green-400"></div>
-                            Paid
-                          </div>
+                        <SelectItem
+                          value="paid"
+                          className="bg-green-900/30 text-green-300 focus:bg-green-900/50 focus:text-green-100"
+                        >
+                          Paid
                         </SelectItem>
-                        <SelectItem value="unpaid">
-                          <div className="flex items-center">
-                            <div className="mr-2 h-2 w-2 rounded-full bg-red-400"></div>
-                            Unpaid
-                          </div>
+                        <SelectItem
+                          value="unpaid"
+                          className="bg-red-900/30 text-red-300 focus:bg-red-900/50 focus:text-red-100"
+                        >
+                          Unpaid
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -394,45 +426,47 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
                     onValueChange={(value) => handleStatusUpdate(selectedReceipt.id, value)}
                     disabled={isSubmitting}
                   >
-                    <SelectTrigger className="w-full border-zinc-700 bg-zinc-800 text-zinc-100">
+                    <SelectTrigger
+                      className={`w-full border ${getStatusBadgeClass(selectedReceipt.status || "submitted")}`}
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
-                      <SelectItem value="submitted">
-                        <div className="flex items-center">
-                          <div className="mr-2 h-2 w-2 rounded-full bg-zinc-400"></div>
-                          Submitted
-                        </div>
+                      <SelectItem
+                        value="submitted"
+                        className="bg-zinc-700/50 text-zinc-300 focus:bg-zinc-700 focus:text-zinc-100"
+                      >
+                        Submitted
                       </SelectItem>
-                      <SelectItem value="processing">
-                        <div className="flex items-center">
-                          <div className="mr-2 h-2 w-2 rounded-full bg-blue-400"></div>
-                          Processing
-                        </div>
+                      <SelectItem
+                        value="processing"
+                        className="bg-blue-900/30 text-blue-300 focus:bg-blue-900/50 focus:text-blue-100"
+                      >
+                        Processing
                       </SelectItem>
-                      <SelectItem value="needs_review">
-                        <div className="flex items-center">
-                          <div className="mr-2 h-2 w-2 rounded-full bg-amber-400"></div>
-                          Needs Review
-                        </div>
+                      <SelectItem
+                        value="needs_review"
+                        className="bg-amber-900/30 text-amber-300 focus:bg-amber-900/50 focus:text-amber-100"
+                      >
+                        Needs Review
                       </SelectItem>
-                      <SelectItem value="approved">
-                        <div className="flex items-center">
-                          <div className="mr-2 h-2 w-2 rounded-full bg-green-400"></div>
-                          Approved
-                        </div>
+                      <SelectItem
+                        value="approved"
+                        className="bg-green-900/30 text-green-300 focus:bg-green-900/50 focus:text-green-100"
+                      >
+                        Approved
                       </SelectItem>
-                      <SelectItem value="rejected">
-                        <div className="flex items-center">
-                          <div className="mr-2 h-2 w-2 rounded-full bg-red-400"></div>
-                          Rejected
-                        </div>
+                      <SelectItem
+                        value="rejected"
+                        className="bg-red-900/30 text-red-300 focus:bg-red-900/50 focus:text-red-100"
+                      >
+                        Rejected
                       </SelectItem>
-                      <SelectItem value="duplicate">
-                        <div className="flex items-center">
-                          <div className="mr-2 h-2 w-2 rounded-full bg-purple-400"></div>
-                          Duplicate
-                        </div>
+                      <SelectItem
+                        value="duplicate"
+                        className="bg-purple-900/30 text-purple-300 focus:bg-purple-900/50 focus:text-purple-100"
+                      >
+                        Duplicate
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -445,21 +479,21 @@ export function ReceiptTable({ receipts: initialReceipts }: ReceiptTableProps) {
                     onValueChange={(value) => handlePaymentUpdate(selectedReceipt.id, value === "paid")}
                     disabled={isSubmitting}
                   >
-                    <SelectTrigger className="w-full border-zinc-700 bg-zinc-800 text-zinc-100">
+                    <SelectTrigger className={`w-full border ${getPaymentBadgeClass(selectedReceipt.paid)}`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
-                      <SelectItem value="paid">
-                        <div className="flex items-center">
-                          <div className="mr-2 h-2 w-2 rounded-full bg-green-400"></div>
-                          Paid
-                        </div>
+                      <SelectItem
+                        value="paid"
+                        className="bg-green-900/30 text-green-300 focus:bg-green-900/50 focus:text-green-100"
+                      >
+                        Paid
                       </SelectItem>
-                      <SelectItem value="unpaid">
-                        <div className="flex items-center">
-                          <div className="mr-2 h-2 w-2 rounded-full bg-red-400"></div>
-                          Unpaid
-                        </div>
+                      <SelectItem
+                        value="unpaid"
+                        className="bg-red-900/30 text-red-300 focus:bg-red-900/50 focus:text-red-100"
+                      >
+                        Unpaid
                       </SelectItem>
                     </SelectContent>
                   </Select>

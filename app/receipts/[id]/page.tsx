@@ -10,6 +10,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, Download, ExternalLink, MapPin, User } from "lucide-react"
 import { ReceiptActions } from "@/components/receipt-actions"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState } from "react"
+import { useToast } from "@/components/ui/use-toast"
 
 // Disable caching for this route
 export const dynamic = "force-dynamic"
@@ -49,6 +52,8 @@ async function getReceiptById(id: string) {
     property: data.staff?.property,
     imageUrl: data.image_url,
     createdAt: data.created_at,
+    status: data.status || "submitted",
+    paid: data.paid || false,
   }
 }
 
@@ -57,11 +62,144 @@ function getProxyImageUrl(originalUrl: string, download = false) {
   return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}${download ? "&download=true" : ""}`
 }
 
-export default async function ReceiptDetailsPage({ params }: { params: { id: string } }) {
-  const receipt = await getReceiptById(params.id)
+export default function ReceiptDetailsPage({ params }: { params: { id: string } }) {
+  const [receipt, setReceipt] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
 
-  if (!receipt) {
-    notFound()
+  // Get status badge class based on status
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case "submitted":
+        return "bg-zinc-700/50 text-zinc-300 border-zinc-600"
+      case "processing":
+        return "bg-blue-900/30 text-blue-300 border-blue-800"
+      case "needs_review":
+        return "bg-amber-900/30 text-amber-300 border-amber-800"
+      case "approved":
+        return "bg-green-900/30 text-green-300 border-green-800"
+      case "rejected":
+        return "bg-red-900/30 text-red-300 border-red-800"
+      case "duplicate":
+        return "bg-purple-900/30 text-purple-300 border-purple-800"
+      default:
+        return "bg-zinc-700/50 text-zinc-300 border-zinc-600"
+    }
+  }
+
+  // Get payment badge class based on paid status
+  const getPaymentBadgeClass = (paid: boolean) => {
+    return paid ? "bg-green-900/30 text-green-300 border-green-800" : "bg-red-900/30 text-red-300 border-red-800"
+  }
+
+  // Handle status update
+  const handleStatusUpdate = async (status: string) => {
+    if (!receipt) return
+    setIsSubmitting(true)
+
+    try {
+      // Try the direct update endpoint
+      const response = await fetch(`/api/receipts/${receipt.id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update receipt status")
+      }
+
+      // Update the local state
+      setReceipt({
+        ...receipt,
+        status,
+      })
+
+      // Show success message
+      toast({
+        title: "Status updated",
+        description: `Receipt status has been updated to ${status}.`,
+      })
+    } catch (error) {
+      console.error("Error updating receipt status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update receipt status. Try refreshing the Supabase schema.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle payment update
+  const handlePaymentUpdate = async (paid: boolean) => {
+    if (!receipt) return
+    setIsSubmitting(true)
+
+    try {
+      // Try the direct update endpoint
+      const response = await fetch(`/api/receipts/${receipt.id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ paid }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update payment status")
+      }
+
+      // Update the local state
+      setReceipt({
+        ...receipt,
+        paid,
+      })
+
+      // Show success message
+      toast({
+        title: "Payment status updated",
+        description: `Receipt has been marked as ${paid ? "paid" : "unpaid"}.`,
+      })
+    } catch (error) {
+      console.error("Error updating payment status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update payment status. Try refreshing the Supabase schema.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Fetch receipt data
+  useState(async () => {
+    setIsLoading(true)
+    const data = await getReceiptById(params.id)
+    if (!data) {
+      notFound()
+    }
+    setReceipt(data)
+    setIsLoading(false)
+  })
+
+  if (isLoading || !receipt) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex h-96 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-500 border-t-zinc-100"></div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -130,6 +268,87 @@ export default async function ReceiptDetailsPage({ params }: { params: { id: str
                 <span className="text-lg font-bold text-zinc-100">{formatCurrency(receipt.amount)}</span>
               </div>
               <div className="text-sm text-zinc-400">Purchase Date: {formatDate(receipt.date)}</div>
+            </div>
+
+            {/* Status and Payment */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-zinc-400">Status</h3>
+                <Select
+                  value={receipt.status}
+                  onValueChange={(value) => handleStatusUpdate(value)}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger className={`w-full border ${getStatusBadgeClass(receipt.status)}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
+                    <SelectItem
+                      value="submitted"
+                      className="bg-zinc-700/50 text-zinc-300 focus:bg-zinc-700 focus:text-zinc-100"
+                    >
+                      Submitted
+                    </SelectItem>
+                    <SelectItem
+                      value="processing"
+                      className="bg-blue-900/30 text-blue-300 focus:bg-blue-900/50 focus:text-blue-100"
+                    >
+                      Processing
+                    </SelectItem>
+                    <SelectItem
+                      value="needs_review"
+                      className="bg-amber-900/30 text-amber-300 focus:bg-amber-900/50 focus:text-amber-100"
+                    >
+                      Needs Review
+                    </SelectItem>
+                    <SelectItem
+                      value="approved"
+                      className="bg-green-900/30 text-green-300 focus:bg-green-900/50 focus:text-green-100"
+                    >
+                      Approved
+                    </SelectItem>
+                    <SelectItem
+                      value="rejected"
+                      className="bg-red-900/30 text-red-300 focus:bg-red-900/50 focus:text-red-100"
+                    >
+                      Rejected
+                    </SelectItem>
+                    <SelectItem
+                      value="duplicate"
+                      className="bg-purple-900/30 text-purple-300 focus:bg-purple-900/50 focus:text-purple-100"
+                    >
+                      Duplicate
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-zinc-400">Payment</h3>
+                <Select
+                  value={receipt.paid ? "paid" : "unpaid"}
+                  onValueChange={(value) => handlePaymentUpdate(value === "paid")}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger className={`w-full border ${getPaymentBadgeClass(receipt.paid)}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
+                    <SelectItem
+                      value="paid"
+                      className="bg-green-900/30 text-green-300 focus:bg-green-900/50 focus:text-green-100"
+                    >
+                      Paid
+                    </SelectItem>
+                    <SelectItem
+                      value="unpaid"
+                      className="bg-red-900/30 text-red-300 focus:bg-red-900/50 focus:text-red-100"
+                    >
+                      Unpaid
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <Separator className="bg-zinc-800" />
