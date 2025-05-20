@@ -24,6 +24,22 @@ interface ReceiptFiltersProps {
   staffMembers: { id: string; name: string }[]
 }
 
+// Define the exact status values as they appear in the database
+const STATUS_VALUES = {
+  PROCESSING: "'Processing'",
+  APPROVED: "'Approved'",
+  REJECTED: "'Rejected'",
+  DUPLICATE: "'Duplicate'",
+}
+
+// Define display names for the status values (without quotes)
+const STATUS_DISPLAY = {
+  [STATUS_VALUES.PROCESSING]: "Processing",
+  [STATUS_VALUES.APPROVED]: "Approved",
+  [STATUS_VALUES.REJECTED]: "Rejected",
+  [STATUS_VALUES.DUPLICATE]: "Duplicate",
+}
+
 export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -108,23 +124,27 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
     // Convert to lowercase for case-insensitive comparison
     const statusLower = status?.toLowerCase() || ""
 
-    switch (statusLower) {
-      case "processing":
-        return "bg-blue-900/30 text-blue-300 border-blue-800"
-      case "approved":
-        return "bg-green-900/30 text-green-300 border-green-800"
-      case "rejected":
-        return "bg-red-900/30 text-red-300 border-red-800"
-      case "duplicate":
-        return "bg-purple-900/30 text-purple-300 border-purple-800"
-      default:
-        return "bg-blue-900/30 text-blue-300 border-blue-800" // Default to processing
+    if (statusLower.includes("processing")) {
+      return "bg-blue-900/30 text-blue-300 border-blue-800"
+    } else if (statusLower.includes("approved")) {
+      return "bg-green-900/30 text-green-300 border-green-800"
+    } else if (statusLower.includes("rejected")) {
+      return "bg-red-900/30 text-red-300 border-red-800"
+    } else if (statusLower.includes("duplicate")) {
+      return "bg-purple-900/30 text-purple-300 border-purple-800"
+    } else {
+      return "bg-blue-900/30 text-blue-300 border-blue-800" // Default to processing
     }
   }
 
   // Get payment status badge class
   const getPaymentBadgeClass = (paid: boolean) => {
     return paid ? "bg-green-900/30 text-green-300 border-green-800" : "bg-zinc-800/80 text-zinc-300 border-zinc-700"
+  }
+
+  // Get display name for status (removes quotes)
+  const getStatusDisplay = (status: string) => {
+    return STATUS_DISPLAY[status] || status.replace(/['"]/g, "")
   }
 
   return (
@@ -201,7 +221,7 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Status Filter */}
+      {/* Status Filter - UPDATED with exact database values */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -213,7 +233,7 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
             Status
             {currentStatus && (
               <span className={`ml-1 rounded-full px-1.5 py-0.5 text-xs ${getStatusBadgeClass(currentStatus)}`}>
-                {currentStatus}
+                {getStatusDisplay(currentStatus)}
               </span>
             )}
           </Button>
@@ -225,36 +245,36 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
             <DropdownMenuItem
               className={cn(
                 "cursor-pointer bg-blue-900/30 text-blue-300 hover:bg-blue-900/50 hover:text-blue-100",
-                currentStatus === "Processing" && "font-medium",
+                currentStatus === STATUS_VALUES.PROCESSING && "font-medium",
               )}
-              onClick={() => applyFilters({ status: "Processing" })}
+              onClick={() => applyFilters({ status: STATUS_VALUES.PROCESSING })}
             >
               Processing
             </DropdownMenuItem>
             <DropdownMenuItem
               className={cn(
                 "cursor-pointer bg-green-900/30 text-green-300 hover:bg-green-900/50 hover:text-green-100",
-                currentStatus === "Approved" && "font-medium",
+                currentStatus === STATUS_VALUES.APPROVED && "font-medium",
               )}
-              onClick={() => applyFilters({ status: "Approved" })}
+              onClick={() => applyFilters({ status: STATUS_VALUES.APPROVED })}
             >
               Approved
             </DropdownMenuItem>
             <DropdownMenuItem
               className={cn(
                 "cursor-pointer bg-red-900/30 text-red-300 hover:bg-red-900/50 hover:text-red-100",
-                currentStatus === "Rejected" && "font-medium",
+                currentStatus === STATUS_VALUES.REJECTED && "font-medium",
               )}
-              onClick={() => applyFilters({ status: "Rejected" })}
+              onClick={() => applyFilters({ status: STATUS_VALUES.REJECTED })}
             >
               Rejected
             </DropdownMenuItem>
             <DropdownMenuItem
               className={cn(
                 "cursor-pointer bg-purple-900/30 text-purple-300 hover:bg-purple-900/50 hover:text-purple-100",
-                currentStatus === "Duplicate" && "font-medium",
+                currentStatus === STATUS_VALUES.DUPLICATE && "font-medium",
               )}
-              onClick={() => applyFilters({ status: "Duplicate" })}
+              onClick={() => applyFilters({ status: STATUS_VALUES.DUPLICATE })}
             >
               Duplicate
             </DropdownMenuItem>

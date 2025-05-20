@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
 
+// Define the exact status values as they appear in the database
+const STATUS_VALUES = {
+  PROCESSING: "'Processing'",
+  APPROVED: "'Approved'",
+  REJECTED: "'Rejected'",
+  DUPLICATE: "'Duplicate'",
+}
+
 export async function GET(request: Request) {
   try {
     // Get search params from URL
@@ -54,11 +62,15 @@ export async function GET(request: Request) {
       query = query.eq("staff_id", staff)
     }
 
-    // Apply status filter if provided - UPDATED for capitalized status values
+    // Apply status filter if provided - UPDATED for exact database values with quotes
     if (status) {
-      if (status === "Processing") {
+      // Remove any quotes from the status parameter to ensure consistent comparison
+      const statusValue = status.replace(/['"]/g, "")
+
+      // Handle special case for Processing status
+      if (statusValue === "Processing" || status === STATUS_VALUES.PROCESSING) {
         // Handle "Processing" status - include both explicit "Processing" and null values
-        const processingQuery = supabase.from("receipts").select("id").eq("status", "Processing")
+        const processingQuery = supabase.from("receipts").select("id").eq("status", "'Processing'")
         const nullStatusQuery = supabase.from("receipts").select("id").is("status", null)
 
         const [processingResult, nullStatusResult] = await Promise.all([processingQuery, nullStatusQuery])
@@ -73,8 +85,8 @@ export async function GET(request: Request) {
           return NextResponse.json({ receipts: [] })
         }
       } else {
-        // For other statuses, use simple equality with capitalized values
-        query = query.eq("status", status) // "Approved", "Rejected", "Duplicate"
+        // For other statuses, use the exact value with quotes
+        query = query.eq("status", status)
       }
     }
 
@@ -145,7 +157,7 @@ export async function GET(request: Request) {
       property: row.staff ? row.staff.property : null,
       imageUrl: row.image_url,
       createdAt: row.created_at,
-      status: row.status || "Processing", // Default to Processing (capitalized) if null
+      status: row.status || "'Processing'", // Default to 'Processing' (with quotes) if null
       paid: row.paid || false, // Default to false if null
     }))
 

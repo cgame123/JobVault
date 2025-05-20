@@ -8,6 +8,14 @@ import { RefreshButton } from "@/components/refresh-button"
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
+// Define the exact status values as they appear in the database
+const STATUS_VALUES = {
+  PROCESSING: "'Processing'",
+  APPROVED: "'Approved'",
+  REJECTED: "'Rejected'",
+  DUPLICATE: "'Duplicate'",
+}
+
 // Function to fetch staff members for filter
 async function getStaffMembers() {
   const { data, error } = await supabase.from("staff").select("id, name").order("name")
@@ -85,12 +93,15 @@ async function getReceipts(searchParams: {
       query = query.eq("staff_id", searchParams.staff)
     }
 
-    // Apply status filter if provided - UPDATED for capitalized status values
+    // Apply status filter if provided - UPDATED for exact database values with quotes
     if (searchParams.status) {
-      // Use a more direct approach that works consistently across environments
-      if (searchParams.status === "Processing") {
-        // First get all receipts with explicit "Processing" status
-        const processingQuery = supabase.from("receipts").select("id").eq("status", "Processing")
+      // Remove any quotes from the status parameter to ensure consistent comparison
+      const statusValue = searchParams.status.replace(/['"]/g, "")
+
+      // Handle special case for Processing status
+      if (statusValue === "Processing" || searchParams.status === STATUS_VALUES.PROCESSING) {
+        // First get all receipts with explicit 'Processing' status
+        const processingQuery = supabase.from("receipts").select("id").eq("status", "'Processing'")
 
         // Then get all receipts with null status
         const nullStatusQuery = supabase.from("receipts").select("id").is("status", null)
@@ -109,8 +120,8 @@ async function getReceipts(searchParams: {
           return [] // No matching receipts
         }
       } else {
-        // For other statuses, use simple equality with capitalized values
-        query = query.eq("status", searchParams.status) // "Approved", "Rejected", "Duplicate"
+        // For other statuses, use the exact value with quotes
+        query = query.eq("status", searchParams.status)
       }
     }
 
@@ -185,7 +196,7 @@ async function getReceipts(searchParams: {
       property: row.staff ? row.staff.property : null,
       imageUrl: row.image_url,
       createdAt: row.created_at,
-      status: row.status || "Processing", // Default to Processing (capitalized) if null
+      status: row.status || "'Processing'", // Default to 'Processing' (with quotes) if null
       paid: row.paid || false, // Default to false if null
     }))
   } catch (error) {
