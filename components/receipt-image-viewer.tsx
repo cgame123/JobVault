@@ -2,16 +2,15 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { AlertCircle, ExternalLink, RefreshCw, ImageIcon, Upload } from "lucide-react"
+import { AlertCircle, ExternalLink, RefreshCw, ImageIcon } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 
 interface ReceiptImageViewerProps {
   imageUrl: string | null
   vendor: string
-  onImageUpload?: (url: string) => Promise<void>
 }
 
-export function ReceiptImageViewer({ imageUrl, vendor, onImageUpload }: ReceiptImageViewerProps) {
+export function ReceiptImageViewer({ imageUrl, vendor }: ReceiptImageViewerProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [proxyUrl, setProxyUrl] = useState("")
@@ -19,13 +18,44 @@ export function ReceiptImageViewer({ imageUrl, vendor, onImageUpload }: ReceiptI
   const [errorDetails, setErrorDetails] = useState<string | null>(null)
   const { toast } = useToast()
 
+  // Function to extract Twilio media SID from URL
+  function extractTwilioMediaInfo(url: string) {
+    try {
+      // Match pattern like: https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Media/{MediaSid}
+      const regex = /\/Accounts\/([^/]+)\/Messages\/([^/]+)\/Media\/([^/]+)/
+      const match = url.match(regex)
+
+      if (match && match.length >= 4) {
+        return {
+          accountSid: match[1],
+          messageSid: match[2],
+          mediaSid: match[3],
+          isTwilioMedia: true,
+        }
+      }
+
+      return { isTwilioMedia: false }
+    } catch (e) {
+      console.error("Error extracting Twilio media info:", e)
+      return { isTwilioMedia: false }
+    }
+  }
+
   // Function to create a proxy URL for images
   function getProxyImageUrl(originalUrl: string | null, download = false, refreshTimestamp = 0) {
     if (!originalUrl || originalUrl === "None") return "/placeholder.svg"
 
-    // If the URL is already a placeholder, return it directly
-    if (originalUrl === "/placeholder.svg") return originalUrl
+    // Check if this is a Twilio media URL
+    if (originalUrl.includes("api.twilio.com") && originalUrl.includes("/Media/")) {
+      const mediaInfo = extractTwilioMediaInfo(originalUrl)
 
+      if (mediaInfo.isTwilioMedia) {
+        const twilioMediaUrl = `/api/twilio-media?messageSid=${mediaInfo.messageSid}&mediaSid=${mediaInfo.mediaSid}${download ? "&download=true" : ""}`
+        return refreshTimestamp ? `${twilioMediaUrl}&t=${refreshTimestamp}` : twilioMediaUrl
+      }
+    }
+
+    // For non-Twilio URLs or if extraction failed, use the regular image proxy
     const baseUrl = `/api/image-proxy?url=${encodeURIComponent(originalUrl)}${download ? "&download=true" : ""}`
     return refreshTimestamp ? `${baseUrl}&t=${refreshTimestamp}` : baseUrl
   }
@@ -54,45 +84,6 @@ export function ReceiptImageViewer({ imageUrl, vendor, onImageUpload }: ReceiptI
     })
   }
 
-  // Test if the image URL is accessible
-  const testImageUrl = async () => {
-    try {
-      setIsLoading(true)
-
-      // First, check if we have a valid URL
-      if (!imageUrl || imageUrl === "None" || imageUrl === "/placeholder.svg") {
-        throw new Error("No valid image URL available")
-      }
-
-      const response = await fetch(`/api/test-image?url=${encodeURIComponent(imageUrl)}`)
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || `Status: ${response.status} ${response.statusText}`)
-      }
-
-      toast({
-        title: "Image test results",
-        description: data.message || "Image is accessible",
-      })
-
-      // If the test was successful, try refreshing the image
-      refreshImage()
-    } catch (error) {
-      console.error("Image test error:", error)
-      setHasError(true)
-      setErrorDetails(error instanceof Error ? error.message : String(error))
-
-      toast({
-        title: "Image test failed",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   // Initialize the proxy URL
   useEffect(() => {
     console.log("Original image URL:", imageUrl)
@@ -109,7 +100,7 @@ export function ReceiptImageViewer({ imageUrl, vendor, onImageUpload }: ReceiptI
   }, [imageUrl, timestamp])
 
   // Check if image is missing
-  const isMissingImage = !imageUrl || imageUrl === "None" || imageUrl === "/placeholder.svg"
+  const isMissingImage = !imageUrl || imageUrl === "None"
 
   return (
     <div className="flex flex-col">
@@ -144,12 +135,6 @@ export function ReceiptImageViewer({ imageUrl, vendor, onImageUpload }: ReceiptI
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-800 p-4">
             <ImageIcon className="h-16 w-16 text-zinc-600 mb-2" />
             <p className="text-center text-zinc-500">No receipt image available</p>
-            {onImageUpload && (
-              <Button variant="outline" size="sm" className="mt-4" onClick={() => {}}>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Image
-              </Button>
-            )}
           </div>
         )}
 
@@ -167,6 +152,9 @@ export function ReceiptImageViewer({ imageUrl, vendor, onImageUpload }: ReceiptI
             console.error("Error loading image:", e)
             setIsLoading(false)
             setHasError(true)
+            setErrorDetails(
+              "Failed to load image. The image might be unavailable or there might be a connection issue.",
+            )
           }}
         />
       </div>
@@ -189,9 +177,6 @@ export function ReceiptImageViewer({ imageUrl, vendor, onImageUpload }: ReceiptI
             Refresh Image
           </Button>
         </div>
-        <Button variant="secondary" size="sm" onClick={testImageUrl} disabled={isMissingImage}>
-          Test Image URL
-        </Button>
       </div>
 
       {/* Debug info */}
