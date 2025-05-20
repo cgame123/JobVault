@@ -85,12 +85,12 @@ async function getReceipts(searchParams: {
       query = query.eq("staff_id", searchParams.staff)
     }
 
-    // Apply status filter if provided - UPDATED for better cross-environment compatibility
+    // Apply status filter if provided - UPDATED for capitalized status values
     if (searchParams.status) {
       // Use a more direct approach that works consistently across environments
-      if (searchParams.status === "processing") {
-        // First get all receipts with explicit "processing" status
-        const processingQuery = supabase.from("receipts").select("id").eq("status", "processing")
+      if (searchParams.status === "Processing") {
+        // First get all receipts with explicit "Processing" status
+        const processingQuery = supabase.from("receipts").select("id").eq("status", "Processing")
 
         // Then get all receipts with null status
         const nullStatusQuery = supabase.from("receipts").select("id").is("status", null)
@@ -109,8 +109,8 @@ async function getReceipts(searchParams: {
           return [] // No matching receipts
         }
       } else {
-        // For other statuses, use simple equality
-        query = query.eq("status", searchParams.status)
+        // For other statuses, use simple equality with capitalized values
+        query = query.eq("status", searchParams.status) // "Approved", "Rejected", "Duplicate"
       }
     }
 
@@ -185,7 +185,7 @@ async function getReceipts(searchParams: {
       property: row.staff ? row.staff.property : null,
       imageUrl: row.image_url,
       createdAt: row.created_at,
-      status: row.status || "processing", // Default to processing if null
+      status: row.status || "Processing", // Default to Processing (capitalized) if null
       paid: row.paid || false, // Default to false if null
     }))
   } catch (error) {

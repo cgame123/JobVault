@@ -54,16 +54,49 @@ export async function GET(request: Request) {
       query = query.eq("staff_id", staff)
     }
 
-    // Apply status filter if provided
+    // Apply status filter if provided - UPDATED for capitalized status values
     if (status) {
-      query = query.eq("status", status)
+      if (status === "Processing") {
+        // Handle "Processing" status - include both explicit "Processing" and null values
+        const processingQuery = supabase.from("receipts").select("id").eq("status", "Processing")
+        const nullStatusQuery = supabase.from("receipts").select("id").is("status", null)
+
+        const [processingResult, nullStatusResult] = await Promise.all([processingQuery, nullStatusQuery])
+
+        const processingIds = processingResult.data?.map((r) => r.id) || []
+        const nullStatusIds = nullStatusResult.data?.map((r) => r.id) || []
+        const combinedIds = [...processingIds, ...nullStatusIds]
+
+        if (combinedIds.length > 0) {
+          query = query.in("id", combinedIds)
+        } else {
+          return NextResponse.json({ receipts: [] })
+        }
+      } else {
+        // For other statuses, use simple equality with capitalized values
+        query = query.eq("status", status) // "Approved", "Rejected", "Duplicate"
+      }
     }
 
     // Apply payment status filter if provided
     if (payment === "paid") {
       query = query.eq("paid", true)
     } else if (payment === "pending") {
-      query = query.eq("paid", false)
+      // Handle "pending" - include both explicit false and null values
+      const unpaidQuery = supabase.from("receipts").select("id").eq("paid", false)
+      const nullPaidQuery = supabase.from("receipts").select("id").is("paid", null)
+
+      const [unpaidResult, nullPaidResult] = await Promise.all([unpaidQuery, nullPaidQuery])
+
+      const unpaidIds = unpaidResult.data?.map((r) => r.id) || []
+      const nullPaidIds = nullPaidResult.data?.map((r) => r.id) || []
+      const combinedIds = [...unpaidIds, ...nullPaidIds]
+
+      if (combinedIds.length > 0) {
+        query = query.in("id", combinedIds)
+      } else {
+        return NextResponse.json({ receipts: [] })
+      }
     }
 
     // Apply date range filters if provided
@@ -112,7 +145,7 @@ export async function GET(request: Request) {
       property: row.staff ? row.staff.property : null,
       imageUrl: row.image_url,
       createdAt: row.created_at,
-      status: row.status || "processing", // Default to processing if null
+      status: row.status || "Processing", // Default to Processing (capitalized) if null
       paid: row.paid || false, // Default to false if null
     }))
 
