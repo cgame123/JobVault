@@ -7,13 +7,43 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, MapPin, User, Edit, Save, X, AlertCircle } from "lucide-react"
+import { ArrowLeft, Download, ExternalLink, MapPin, User, Edit, Save, X, AlertCircle, RefreshCw } from "lucide-react"
 import { ReceiptActions } from "@/components/receipt-actions"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { Input } from "@/components/ui/input"
-import { SimpleReceiptImage } from "@/components/simple-receipt-image"
+
+// Function to create a proxy URL for Twilio images
+function getProxyImageUrl(originalUrl: string | null, download = false) {
+  if (!originalUrl || originalUrl === "None") return "/placeholder.svg"
+
+  // Check if this is a Twilio URL
+  const isTwilioUrl = originalUrl.includes("twilio.com") || originalUrl.includes("api.twilio.com")
+
+  // If it's a Twilio URL, use our specialized endpoint
+  if (isTwilioUrl) {
+    try {
+      // Extract Twilio media info from URL
+      const regex = /\/Accounts\/([^/]+)\/Messages\/([^/]+)\/Media\/([^/]+)/
+      const match = originalUrl.match(regex)
+
+      if (match && match.length >= 4) {
+        const accountSid = match[1]
+        const messageSid = match[2]
+        const mediaSid = match[3]
+
+        // Use our specialized Twilio media endpoint
+        return `/api/twilio-media?messageSid=${messageSid}&mediaSid=${mediaSid}${download ? "&download=true" : ""}`
+      }
+    } catch (e) {
+      console.error("Error extracting Twilio media info:", e)
+    }
+  }
+
+  // For non-Twilio URLs or if extraction failed, use the regular image proxy
+  return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}${download ? "&download=true" : ""}`
+}
 
 // Function to get today's date in YYYY-MM-DD format
 function getTodayDate() {
@@ -46,6 +76,8 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
   const [editedReceipt, setEditedReceipt] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [imageLoading, setImageLoading] = useState(true)
+  const [imageError, setImageError] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -314,6 +346,48 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
     }
   }
 
+  // Refresh the image
+  const refreshImage = () => {
+    if (!receipt?.imageUrl) {
+      toast({
+        title: "No image available",
+        description: "This receipt doesn't have an associated image.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setImageLoading(true)
+    setImageError(false)
+
+    // Force a reload of the image by adding a timestamp
+    const img = new Image()
+    img.onload = () => {
+      setImageLoading(false)
+      // Update the DOM to show the new image
+      const imgElement = document.getElementById("receipt-image") as HTMLImageElement
+      if (imgElement) {
+        const timestamp = Date.now()
+        imgElement.src = getProxyImageUrl(receipt.imageUrl) + `&t=${timestamp}`
+      }
+
+      toast({
+        title: "Image refreshed",
+        description: "The receipt image has been refreshed.",
+      })
+    }
+    img.onerror = () => {
+      setImageLoading(false)
+      setImageError(true)
+      toast({
+        title: "Error",
+        description: "Failed to refresh the image.",
+        variant: "destructive",
+      })
+    }
+    img.src = getProxyImageUrl(receipt.imageUrl) + `&t=${Date.now()}`
+  }
+
   // Fetch receipt data
   useEffect(() => {
     async function loadReceipt() {
@@ -504,8 +578,102 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Use the simplified receipt image component */}
-            <SimpleReceiptImage imageUrl={receipt.imageUrl} vendor={receipt.vendor} />
+            {/* Image container */}
+            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-md border border-zinc-700 bg-zinc-800">
+              {/* Loading indicator */}
+              {imageLoading && receipt.imageUrl && (
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/50 z-10">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-500 border-t-zinc-100"></div>
+                </div>
+              )}
+
+              {/* Error message */}
+              {imageError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/50 p-4 z-10">
+                  <AlertCircle className="h-10 w-10 text-red-400 mb-2" />
+                  <p className="text-center text-zinc-400">Failed to load image</p>
+                  <Button variant="outline" size="sm" className="mt-4" onClick={refreshImage}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Try Again
+                  </Button>
+                </div>
+              )}
+
+              {/* The image */}
+              {receipt.imageUrl ? (
+                <img
+                  id="receipt-image"
+                  src={getProxyImageUrl(receipt.imageUrl) || "/placeholder.svg"}
+                  alt={`Receipt from ${receipt.vendor}`}
+                  className="h-full w-full object-contain"
+                  onLoad={() => {
+                    console.log("Image loaded successfully")
+                    setImageLoading(false)
+                    setImageError(false)
+                  }}
+                  onError={(e) => {
+                    console.error("Error loading image:", e)
+                    setImageLoading(false)
+                    setImageError(true)
+                  }}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-16 w-16 text-zinc-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                  <p className="mt-2 text-zinc-500">No receipt image available</p>
+                </div>
+              )}
+            </div>
+
+            {/* Controls */}
+            <div className="mt-4 flex flex-col gap-2">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => window.open(getProxyImageUrl(receipt.imageUrl), "_blank")}
+                  disabled={!receipt.imageUrl || imageError}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Open in New Tab
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={refreshImage}
+                  disabled={!receipt.imageUrl}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh Image
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(getProxyImageUrl(receipt.imageUrl, true), "_blank")}
+                disabled={!receipt.imageUrl || imageError}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download Image
+              </Button>
+            </div>
+
+            {/* Debug info */}
+            <div className="mt-2 text-xs text-zinc-500 break-all">
+              <p>Image URL: {receipt.imageUrl || "None"}</p>
+            </div>
           </CardContent>
         </Card>
 

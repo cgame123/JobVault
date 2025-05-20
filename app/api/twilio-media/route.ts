@@ -2,13 +2,13 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(req: NextRequest) {
   try {
-    // Get the media SID from the query parameters
-    const mediaSid = req.nextUrl.searchParams.get("mediaSid")
+    // Get the message and media SIDs from the query parameters
     const messageSid = req.nextUrl.searchParams.get("messageSid")
+    const mediaSid = req.nextUrl.searchParams.get("mediaSid")
     const download = req.nextUrl.searchParams.get("download") === "true"
 
-    if (!mediaSid || !messageSid) {
-      return NextResponse.json({ error: "Media SID and Message SID are required" }, { status: 400 })
+    if (!messageSid || !mediaSid) {
+      return NextResponse.json({ error: "Message SID and Media SID are required" }, { status: 400 })
     }
 
     // Get Twilio credentials from environment variables
@@ -20,12 +20,12 @@ export async function GET(req: NextRequest) {
     }
 
     // Construct the Twilio media URL
-    const mediaUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages/${messageSid}/Media/${mediaSid}`
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages/${messageSid}/Media/${mediaSid}`
 
-    console.log("Fetching Twilio media:", mediaUrl)
+    console.log("Fetching Twilio media from:", url)
 
     // Fetch the media with authentication
-    const response = await fetch(mediaUrl, {
+    const response = await fetch(url, {
       headers: {
         Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
       },
@@ -68,10 +68,7 @@ export async function GET(req: NextRequest) {
 
     return mediaResponse
   } catch (error) {
-    console.error("Error in Twilio media handler:", error)
-    return NextResponse.json(
-      { error: "Failed to fetch Twilio media", details: error instanceof Error ? error.message : String(error) },
-      { status: 500 },
-    )
+    console.error("Error in Twilio media endpoint:", error)
+    return NextResponse.json({ error: "Failed to fetch Twilio media" }, { status: 500 })
   }
 }

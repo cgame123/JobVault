@@ -1,98 +1,73 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useToast } from "@/components/ui/use-toast"
-import { MoreVertical, Trash, Edit } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { MoreVertical, Eye, Download, Trash2, CheckCircle, XCircle } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ReceiptDetailModal } from "./receipt-detail-modal"
 
 interface ReceiptActionsProps {
-  receipt: {
-    id: string
-    vendor: string
-    status?: string
-    paid?: boolean
-  }
+  receipt: any
 }
 
 export function ReceiptActions({ receipt }: ReceiptActionsProps) {
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [status, setStatus] = useState(receipt.status || "processing")
-  const [paid, setPaid] = useState(receipt.paid || false)
-  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
 
-  // Get status badge class based on status
-  const getStatusBadgeClass = (status: string) => {
-    // Convert to lowercase for case-insensitive comparison
-    const statusLower = status?.toLowerCase() || ""
-
-    switch (statusLower) {
-      case "processing":
-        return "bg-blue-900/30 text-blue-300 border-blue-800"
-      case "approved":
-        return "bg-green-900/30 text-green-300 border-green-800"
-      case "rejected":
-        return "bg-red-900/30 text-red-300 border-red-800"
-      case "duplicate":
-        return "bg-purple-900/30 text-purple-300 border-purple-800"
-      default:
-        return "bg-blue-900/30 text-blue-300 border-blue-800" // Default to processing
-    }
+  // Handle view details
+  const handleViewDetails = () => {
+    router.push(`/receipts/${receipt.id}`)
   }
 
-  // Get payment badge class based on paid status
-  const getPaymentBadgeClass = (paid: boolean) => {
-    return paid ? "bg-green-900/30 text-green-300 border-green-800" : "bg-zinc-700/50 text-zinc-300 border-zinc-600"
-  }
-
-  const handleDelete = async () => {
-    setIsSubmitting(true)
-
-    try {
-      const response = await fetch(`/api/receipts/${receipt.id}`, {
-        method: "DELETE",
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Failed to delete receipt")
-      }
-
+  // Handle download
+  const handleDownload = () => {
+    if (!receipt.imageUrl) {
       toast({
-        title: "Receipt deleted",
-        description: `Receipt from ${receipt.vendor} has been deleted successfully.`,
-      })
-
-      // Redirect to dashboard
-      router.push("/")
-    } catch (error) {
-      console.error("Error deleting receipt:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete receipt",
+        title: "No image available",
+        description: "This receipt doesn't have an associated image to download.",
         variant: "destructive",
       })
-    } finally {
-      setIsSubmitting(false)
-      setIsDeleting(false)
+      return
     }
+
+    // Create a proxy URL for the image with download flag
+    let downloadUrl = `/api/image-proxy?url=${encodeURIComponent(receipt.imageUrl)}&download=true`
+
+    // Check if this is a Twilio media URL
+    if (receipt.imageUrl.includes("api.twilio.com") && receipt.imageUrl.includes("/Media/")) {
+      // Extract the message SID and media SID from Twilio URLs
+      const regex = /\/Accounts\/([^/]+)\/Messages\/([^/]+)\/Media\/([^/]+)/
+      const match = receipt.imageUrl.match(regex)
+
+      if (match && match.length >= 4) {
+        const messageSid = match[2]
+        const mediaSid = match[3]
+        downloadUrl = `/api/twilio-media?messageSid=${messageSid}&mediaSid=${mediaSid}&download=true`
+      }
+    }
+
+    // Open the download URL in a new tab
+    window.open(downloadUrl, "_blank")
   }
 
-  const handleUpdate = async () => {
-    setIsSubmitting(true)
+  // Handle quick view
+  const handleQuickView = () => {
+    setIsModalOpen(true)
+  }
+
+  // Handle status update
+  const handleStatusUpdate = async (status: string) => {
+    setIsLoading(true)
 
     try {
       const response = await fetch(`/api/receipts/${receipt.id}/status`, {
@@ -100,31 +75,102 @@ export function ReceiptActions({ receipt }: ReceiptActionsProps) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ status, paid }),
+        body: JSON.stringify({ status }),
       })
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Failed to update receipt")
+        throw new Error("Failed to update receipt status")
       }
 
       toast({
-        title: "Receipt updated",
-        description: `Receipt from ${receipt.vendor} has been updated successfully.`,
+        title: "Status updated",
+        description: `Receipt status has been updated to ${status}.`,
       })
 
-      // Close dialog and refresh page
-      setIsEditing(false)
+      // Refresh the page to show the updated status
       router.refresh()
     } catch (error) {
-      console.error("Error updating receipt:", error)
+      console.error("Error updating receipt status:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update receipt",
+        description: "Failed to update receipt status.",
         variant: "destructive",
       })
     } finally {
-      setIsSubmitting(false)
+      setIsLoading(false)
+    }
+  }
+
+  // Handle payment update
+  const handlePaymentUpdate = async (paid: boolean) => {
+    setIsLoading(true)
+
+    try {
+      const response = await fetch(`/api/receipts/${receipt.id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ paid }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to update payment status")
+      }
+
+      toast({
+        title: "Payment status updated",
+        description: `Receipt has been marked as ${paid ? "paid" : "pending"}.`,
+      })
+
+      // Refresh the page to show the updated status
+      router.refresh()
+    } catch (error) {
+      console.error("Error updating payment status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update payment status.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Handle delete
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this receipt? This action cannot be undone.")) {
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const response = await fetch(`/api/receipts/${receipt.id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete receipt")
+      }
+
+      toast({
+        title: "Receipt deleted",
+        description: "The receipt has been deleted successfully.",
+      })
+
+      // Redirect to the receipts list
+      router.push("/receipts")
+      router.refresh()
+    } catch (error) {
+      console.error("Error deleting receipt:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete receipt.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -132,151 +178,52 @@ export function ReceiptActions({ receipt }: ReceiptActionsProps) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-zinc-100">
+          <Button variant="ghost" size="icon" disabled={isLoading}>
             <MoreVertical className="h-4 w-4" />
             <span className="sr-only">Actions</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="border-zinc-800 bg-zinc-900 text-zinc-100">
-          <DropdownMenuItem onClick={() => setIsEditing(true)} className="focus:bg-zinc-800 focus:text-zinc-100">
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Receipt
+        <DropdownMenuContent align="end" className="border-zinc-800 bg-zinc-900">
+          <DropdownMenuItem onClick={handleViewDetails} className="text-zinc-300 hover:text-zinc-100">
+            <Eye className="mr-2 h-4 w-4" />
+            View Details
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleQuickView} className="text-zinc-300 hover:text-zinc-100">
+            <Eye className="mr-2 h-4 w-4" />
+            Quick View
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleDownload} className="text-zinc-300 hover:text-zinc-100">
+            <Download className="mr-2 h-4 w-4" />
+            Download
+          </DropdownMenuItem>
+          <DropdownMenuSeparator className="bg-zinc-800" />
           <DropdownMenuItem
-            onClick={() => setIsDeleting(true)}
-            className="text-red-400 focus:bg-zinc-800 focus:text-red-400"
+            onClick={() => handleStatusUpdate("Approved")}
+            className="text-green-300 hover:text-green-100"
           >
-            <Trash className="mr-2 h-4 w-4" />
-            Delete Receipt
+            <CheckCircle className="mr-2 h-4 w-4" />
+            Mark as Approved
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleStatusUpdate("Rejected")} className="text-red-300 hover:text-red-100">
+            <XCircle className="mr-2 h-4 w-4" />
+            Mark as Rejected
+          </DropdownMenuItem>
+          <DropdownMenuSeparator className="bg-zinc-800" />
+          <DropdownMenuItem onClick={handleDelete} className="text-red-300 hover:text-red-100">
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditing} onOpenChange={(open) => !open && setIsEditing(false)}>
-        <DialogContent className="border-zinc-800 bg-zinc-900 text-zinc-100 sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Receipt</DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              Update the status and payment information for this receipt.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="status" className="text-right text-zinc-400">
-                Status
-              </label>
-              <div className="col-span-3">
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger className={`w-full border ${getStatusBadgeClass(status)}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
-                    <SelectItem
-                      value="Processing"
-                      className="bg-blue-900/30 text-blue-300 focus:bg-blue-900/50 focus:text-blue-100"
-                    >
-                      Processing
-                    </SelectItem>
-                    <SelectItem
-                      value="Approved"
-                      className="bg-green-900/30 text-green-300 focus:bg-green-900/50 focus:text-green-100"
-                    >
-                      Approved
-                    </SelectItem>
-                    <SelectItem
-                      value="Rejected"
-                      className="bg-red-900/30 text-red-300 focus:bg-red-900/50 focus:text-red-100"
-                    >
-                      Rejected
-                    </SelectItem>
-                    <SelectItem
-                      value="Duplicate"
-                      className="bg-purple-900/30 text-purple-300 focus:bg-purple-900/50 focus:text-purple-100"
-                    >
-                      Duplicate
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="paid" className="text-right text-zinc-400">
-                Payment
-              </label>
-              <div className="col-span-3">
-                <Select value={paid ? "paid" : "unpaid"} onValueChange={(value) => setPaid(value === "paid")}>
-                  <SelectTrigger className={`w-full border ${getPaymentBadgeClass(paid)}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-zinc-700 bg-zinc-800 text-zinc-100">
-                    <SelectItem
-                      value="paid"
-                      className="bg-green-900/30 text-green-300 focus:bg-green-900/50 focus:text-green-100"
-                    >
-                      Paid
-                    </SelectItem>
-                    <SelectItem
-                      value="unpaid"
-                      className="bg-zinc-700/50 text-zinc-300 focus:bg-zinc-700/70 focus:text-zinc-100"
-                    >
-                      Pending
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsEditing(false)}
-              className="border-zinc-700 bg-transparent text-zinc-100 hover:bg-zinc-800 hover:text-zinc-100"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleUpdate}
-              disabled={isSubmitting}
-              className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
-            >
-              {isSubmitting ? "Saving..." : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleting} onOpenChange={(open) => !open && setIsDeleting(false)}>
-        <DialogContent className="border-zinc-800 bg-zinc-900 text-zinc-100 sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete Receipt</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-zinc-300">
-              Are you sure you want to delete this receipt from <span className="font-semibold">{receipt.vendor}</span>?
-              This action cannot be undone.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsDeleting(false)}
-              className="border-zinc-700 bg-transparent text-zinc-100 hover:bg-zinc-800 hover:text-zinc-100"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button type="button" variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
-              {isSubmitting ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReceiptDetailModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        receipt={receipt}
+        onStatusChange={handleStatusUpdate}
+        onPaymentChange={handlePaymentUpdate}
+        onDelete={handleDelete}
+      />
     </>
   )
 }
