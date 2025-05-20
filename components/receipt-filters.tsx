@@ -213,7 +213,7 @@ export function ReceiptFilters({ properties, staffMembers }: ReceiptFiltersProps
             Status
             {currentStatus && (
               <span className={`ml-1 rounded-full px-1.5 py-0.5 text-xs ${getStatusBadgeClass(currentStatus)}`}>
-                {currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}
+                {currentStatus}
               </span>
             )}
           </Button>
