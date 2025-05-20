@@ -7,19 +7,13 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Download, ExternalLink, MapPin, User, Edit, Save, X, AlertCircle } from "lucide-react"
+import { ArrowLeft, MapPin, User, Edit, Save, X, AlertCircle } from "lucide-react"
 import { ReceiptActions } from "@/components/receipt-actions"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { Input } from "@/components/ui/input"
-import { ReceiptImageViewer } from "@/components/receipt-image-viewer"
-
-// Function to create a proxy URL for Twilio images
-function getProxyImageUrl(originalUrl: string, download = false) {
-  if (!originalUrl) return "/placeholder.svg"
-  return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}${download ? "&download=true" : ""}`
-}
+import { SimpleReceiptImage } from "@/components/simple-receipt-image"
 
 // Function to get today's date in YYYY-MM-DD format
 function getTodayDate() {
@@ -354,10 +348,10 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
           date: formattedDate,
           vendor: data.vendor || "Unknown Vendor",
           amount: Number(data.amount) || 0,
-          staffId: data.staffId || "",
-          staffName: data.staffName || "Unknown Staff",
+          staffId: data.staff_id || data.staffId || "",
+          staffName: data.staff_name || data.staffName || "Unknown Staff",
           property: data.property || "Unassigned",
-          imageUrl: data.imageUrl || "",
+          imageUrl: data.image_url || data.imageUrl || null,
         }
 
         // Log the image URL for debugging
@@ -505,32 +499,14 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
         <Card className="md:col-span-2 border-zinc-800 bg-zinc-900/50 shadow-lg">
           <CardHeader>
             <CardTitle>Receipt Image</CardTitle>
-            <CardDescription className="text-zinc-400">Original receipt from {receipt.vendor}</CardDescription>
+            <CardDescription className="text-zinc-400">
+              {receipt.imageUrl ? `Original receipt from ${receipt.vendor}` : "No image available for this receipt"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Use the improved ReceiptImageViewer component */}
-            <ReceiptImageViewer imageUrl={receipt.imageUrl} vendor={receipt.vendor} />
+            {/* Use the simplified receipt image component */}
+            <SimpleReceiptImage imageUrl={receipt.imageUrl} vendor={receipt.vendor} />
           </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(getProxyImageUrl(receipt.imageUrl), "_blank")}
-              className="text-zinc-400 hover:text-zinc-100"
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              View Full Size
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(getProxyImageUrl(receipt.imageUrl, true), "_blank")}
-              className="text-zinc-400 hover:text-zinc-100"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download
-            </Button>
-          </CardFooter>
         </Card>
 
         {/* Right column - Receipt details */}
