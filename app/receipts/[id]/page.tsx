@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import Link from "next/link"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -14,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { Input } from "@/components/ui/input"
+import { ReceiptImageViewer } from "@/components/receipt-image-viewer"
 
 // Function to create a proxy URL for Twilio images
 function getProxyImageUrl(originalUrl: string, download = false) {
@@ -52,8 +52,6 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
   const [editedReceipt, setEditedReceipt] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [imageLoading, setImageLoading] = useState(true)
-  const [imageError, setImageError] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -327,8 +325,6 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
     async function loadReceipt() {
       setIsLoading(true)
       setError(null)
-      setImageLoading(true)
-      setImageError(false)
 
       try {
         // Fetch receipt data
@@ -461,10 +457,6 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
     )
   }
 
-  // Create the proxy image URL
-  const proxyImageUrl = getProxyImageUrl(receipt.imageUrl)
-  console.log("Proxy image URL:", proxyImageUrl)
-
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center justify-between">
@@ -516,81 +508,14 @@ export default function ReceiptDetailsPage({ params }: { params: { id: string } 
             <CardDescription className="text-zinc-400">Original receipt from {receipt.vendor}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-md border border-zinc-700 bg-zinc-800">
-              {/* Show the receipt image preview */}
-              <div className="relative h-full w-full">
-                <Image
-                  src={proxyImageUrl || "/placeholder.svg"}
-                  alt={`Receipt from ${receipt.vendor}`}
-                  fill
-                  className="object-contain"
-                  onLoadingComplete={() => {
-                    console.log("Image loaded successfully")
-                    setImageLoading(false)
-                  }}
-                  onError={() => {
-                    console.error("Error loading image:", proxyImageUrl)
-                    setImageLoading(false)
-                    setImageError(true)
-                  }}
-                  unoptimized
-                />
-
-                {/* Loading state */}
-                {imageLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/50">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-500 border-t-zinc-100"></div>
-                  </div>
-                )}
-
-                {/* Error state */}
-                {imageError && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/50 p-4">
-                    <AlertCircle className="h-10 w-10 text-red-400 mb-2" />
-                    <p className="text-center text-zinc-400">Failed to load image</p>
-                    <p className="text-center text-zinc-500 text-sm mt-1">
-                      The image may be unavailable or there might be a connection issue
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-4"
-                      onClick={() => {
-                        setImageLoading(true)
-                        setImageError(false)
-                        // Force reload the image by updating a timestamp
-                        const timestamp = new Date().getTime()
-                        const refreshedUrl = `${proxyImageUrl}&t=${timestamp}`
-                        const img = new Image()
-                        img.src = refreshedUrl
-                        img.onload = () => {
-                          // Update the image source with the refreshed URL
-                          const imgElement = document.querySelector(
-                            `img[alt="Receipt from ${receipt.vendor}"]`,
-                          ) as HTMLImageElement
-                          if (imgElement) {
-                            imgElement.src = refreshedUrl
-                            setImageLoading(false)
-                          }
-                        }
-                        img.onerror = () => {
-                          setImageLoading(false)
-                          setImageError(true)
-                        }
-                      }}
-                    >
-                      Try Again
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Use the improved ReceiptImageViewer component */}
+            <ReceiptImageViewer imageUrl={receipt.imageUrl} vendor={receipt.vendor} />
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(proxyImageUrl, "_blank")}
+              onClick={() => window.open(getProxyImageUrl(receipt.imageUrl), "_blank")}
               className="text-zinc-400 hover:text-zinc-100"
             >
               <ExternalLink className="mr-2 h-4 w-4" />
