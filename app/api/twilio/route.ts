@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
         staff_name: staffData?.name || null,
         image_url: mediaUrl,
         created_at: new Date().toISOString(),
+        status: "'Processing'", // Explicitly set status with single quotes
       })
 
       if (insertError) {
